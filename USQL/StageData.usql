@@ -1,4 +1,7 @@
-﻿DROP PROCEDURE IF EXISTS GHInsights.dbo.StageData;
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+DROP PROCEDURE IF EXISTS GHInsights.dbo.StageData;
 CREATE PROCEDURE GHInsights.dbo.StageData(@Year string, @Month string, @Day string)
 AS
 BEGIN

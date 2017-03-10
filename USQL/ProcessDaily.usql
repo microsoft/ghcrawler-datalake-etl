@@ -1,4 +1,7 @@
-﻿
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+
 DROP PROCEDURE IF EXISTS GHInsights.dbo.ProcessDaily;
 
 CREATE PROCEDURE GHInsights.dbo.ProcessDaily (@Year string, @Month string, @Day string)

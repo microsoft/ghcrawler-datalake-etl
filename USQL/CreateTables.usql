@@ -1,4 +1,7 @@
-﻿CREATE DATABASE IF NOT EXISTS GHInsights;
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+CREATE DATABASE IF NOT EXISTS GHInsights;
 
 CREATE DATABASE IF NOT EXISTS Staging;
 
