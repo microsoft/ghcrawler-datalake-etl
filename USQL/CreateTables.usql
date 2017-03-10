@@ -1,0 +1,22 @@
+﻿CREATE DATABASE IF NOT EXISTS GHInsights;
+
+CREATE DATABASE IF NOT EXISTS Staging;
+
+USE Staging;
+
+CREATE SCHEMA IF NOT EXISTS GHCrawler;
+
+DROP TABLE IF EXISTS GHCrawler.GitHubData;
+
+
+CREATE TABLE Staging.GHCrawler.GitHubData (
+    EventName string
+    ,IngestDate string
+    ,ProcessedAt DateTime?
+    ,Urn string
+    ,Data SqlMap<string, byte[]>
+    ,INDEX IX_Stage_GhCrawlerData
+        CLUSTERED (EventName, Urn)
+        PARTITIONED BY (IngestDate)
+            HASH (EventName, Urn) INTO 20
+);

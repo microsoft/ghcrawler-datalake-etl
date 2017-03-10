@@ -1,0 +1,82 @@
+﻿USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+@RawEventPayloadPage =
+SELECT  Urn AS EventUrn
+        ,ProcessedAt
+        ,Data
+        ,Urn AS EtlSourceId
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+        FROM Staging.GHCrawler.GitHubData AS e
+WHERE EventName == "GollumEvent";
+
+@EventPayloadPageDeDupe =
+SELECT   *
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawEventPayloadPage;
+
+@EventPayloadPageExplode =
+SELECT	 EtlIngestDate
+        ,EventUrn
+        ,ProcessedAt
+        ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS EventPayloadPageId
+        ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
+        ,Value AS Value
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadPageDeDupe AS e
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("payload.pages[")
+AND RowNumber == 1;
+
+@EventPayloadPagePrePivot =
+SELECT	 EtlIngestDate
+        ,EventUrn
+        ,ProcessedAt
+        ,EventPayloadPageId
+        ,MAP_AGG(ColumnName, Value) AS Data
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadPageExplode AS e
+GROUP BY EtlIngestDate, EventUrn, ProcessedAt, EventPayloadPageId, EtlSourceId, SchemaVersion;
+
+@EventPayloadPage =
+SELECT   EventUrn
+        ,ProcessedAt
+        ,EventPayloadPageId
+        ,EtlIngestDate
+        ,GHInsights.USql.Utility.GetString(Data, "sha") AS EventPayloadPageSha
+	,GHInsights.USql.Utility.GetString(Data, "action") AS Action
+	,GHInsights.USql.Utility.GetString(Data, "page_name") AS PageName
+	,GHInsights.USql.Utility.GetString(Data, "summary") AS Summary
+	,GHInsights.USql.Utility.GetString(Data, "title") AS Title
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadPagePrePivot AS e;
+
+DROP TABLE IF EXISTS dbo.EventPayloadPage;
+
+CREATE TABLE dbo.EventPayloadPage
+(
+    INDEX IX_EventPayloadPage
+    CLUSTERED(EventUrn, EventPayloadPageSha)
+    DISTRIBUTE
+    HASH(EventUrn, EventPayloadPageSha)
+    INTO 20
+)
+AS
+SELECT   EventUrn
+        ,EventPayloadPageId
+        ,EtlIngestDate
+        ,EventPayloadPageSha
+		,Action
+		,PageName
+		,Summary
+		,Title
+        ,SchemaVersion
+    ,ProcessedAt
+    ,EtlSourceId
+FROM @EventPayloadPage;
+

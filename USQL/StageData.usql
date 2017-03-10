@@ -1,0 +1,33 @@
+﻿DROP PROCEDURE IF EXISTS GHInsights.dbo.StageData;
+CREATE PROCEDURE GHInsights.dbo.StageData(@Year string, @Month string, @Day string)
+AS
+BEGIN
+
+USE GHInsights;
+
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+DECLARE @IngestDate = DateTime.Parse(string.Format("{0:D4}-{1:D2}-{2:D3}", @Year, @Month, @Day), null, DateTimeStyles.AssumeUniversal).ToUniversalTime();
+DECLARE @IngestDatePartition = @IngestDate.ToString("yyyy-MM-dd");
+
+@ExtractedData =
+    EXTRACT  FileName string
+            ,IngestDate DateTime
+            ,Data SqlMap<string, byte[]>
+    FROM "wasb://crawlerprod-log@ospobackup/v1/{IngestDate:yyyy}/{IngestDate:MM}/{IngestDate:dd}/{FileName}.json"
+    USING GHInsights.USql.Extractors.FlatJson(outputColumnName: "Data", silent: true);
+
+ALTER TABLE Staging.GHCrawler.GitHubData DROP IF EXISTS PARTITION (@IngestDatePartition);
+ALTER TABLE Staging.GHCrawler.GitHubData ADD PARTITION (@IngestDatePartition);
+
+INSERT Staging.GHCrawler.GitHubData
+PARTITION (@IngestDatePartition)
+SELECT  GHInsights.USql.Utility.GetString(Data,"_metadata.type") AS EventName
+       ,GHInsights.USql.Utility.GetDateTime(Data,"_metadata.processedAt") AS ProcessedAt
+       ,GHInsights.USql.Utility.GetString(Data,"_metadata.links.self.href") AS Urn
+       ,Data
+FROM @ExtractedData
+WHERE IngestDate == @IngestDate;
+
+END;
