@@ -7,9 +7,6 @@ ghiverify.py - tools to verify data integrity for GHInsights data
 # Prerequisites: pip install these packages ...
 # azure, azure-mgmt-resource, azure-mgmt-datalake-store, azure-datalake-store
 
-# Note that datalake_*() functions that require an Oauth token default to locally
-# stored settings (client secret, etc) if no token is passed.
-
 from azure.common.credentials import ServicePrincipalCredentials
 from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
 from azure.mgmt.datalake.store.models import DataLakeStoreAccount
