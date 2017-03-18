@@ -97,9 +97,10 @@ def daily_diff(): #----------------------------------------------------------<<<
         print(entity.upper().rjust(24) +
               ' - elapsed time:{0:6.1f} seconds'.format(entity_elapsed))
 
+    print(54*'-')
     total_elapsed = default_timer() - start_time
-    print(11*' ' +
-          'Total data verification time:{:6.1f} seconds'.format(total_elapsed))
+    print('    Total elapsed time for all entities:{:6.1f} seconds'. \
+        format(total_elapsed))
 
 def datafile_local(entity=None, filetype=None): #----------------------------<<<
     """Returns relative path/filename for a local CSV file.
@@ -208,18 +209,22 @@ def datalake_dir(folder, token=None): #--------------------------------------<<<
                   key=lambda fname: fname.lower())
 
 def datalake_download_entity(entity=None, token=None): #---------------------<<<
-    """Download a file from Azure Data Lake Store.
+    """Download specified entity type's CSV file from ghinsights Data Lake store.
 
     entity = entity type (for example, 'repo')
     token = Oauth token for Azure Data Lake; default = token_creds()
 
     Downloads a CSV file to be used for comparison to current GitHub API data.
     """
-    if not token:
-        token, _ = token_creds()
-
     localfile = datafile_local(entity=entity, filetype='datalake')
     remotefile = datalake_filename(entity=entity)
+    datalake_download_file(localfile, remotefile)
+
+def datalake_download_file(localfile, remotefile, token=None): #-------------<<<
+    """Download a file from Azure Data Lake Store.
+    """
+    if not token:
+        token, _ = token_creds()
 
     adlsAccount = setting(topic='ghiverify', section='azure', key='adls-account')
     adlsFileSystemClient = \
@@ -620,4 +625,5 @@ def repo_include(reponame, created_at): #------------------------------------<<<
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
-    daily_diff()
+    datalake_download_entity('repo')
+    #daily_diff()
