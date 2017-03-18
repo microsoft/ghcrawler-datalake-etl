@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+from timeit import default_timer
 
 import requests
 
@@ -47,6 +48,92 @@ def data_sort(datadict): #---------------------------------------------------<<<
     sortvalue = str(datadict[sortkey]).lower()
     return sortvalue
 
+def daily_diff(): #----------------------------------------------------------<<<
+    """Generate diff files for all tracked entities.
+    """
+    datestr = str(datetime.datetime.now())[:10]
+    start_time = default_timer()
+    print(10*'-' + ' Data Verification for ' + datestr + ' ' + 10*'-')
+
+    for entity in ['repo']:
+        entity_start = default_timer()
+
+        # download the current CSV file from Azure Data Lake Store
+        download_start = default_timer()
+        datalake_download_entity(entity)
+        download_elapsed = default_timer() - download_start
+        print('Download ' + entity +
+              '.csv from Data Lake '.ljust(27, '.') +
+              '{0:6.1f} seconds'.format(download_elapsed))
+
+        # get current results from GitHub API for this entity
+        github_start = default_timer()
+        github_get_entity(entity)
+        github_elapsed = default_timer() - github_start
+        print('Get live data from GitHub API '.ljust(40, '.') +
+              '{0:6.1f} seconds'.format(github_elapsed))
+
+        # generate diff report
+        diff_start = default_timer()
+        missing, extra, mismatch = diff_report(entity)
+        diff_elapsed = default_timer() - diff_start
+        print('Generate ' + entity + '_diff.csv '.ljust(27, '.') +
+              '{0:6.1f} seconds'.format(diff_elapsed))
+        if missing:
+            print(24*' ' + 'Missing: {:7,}'.format(missing))
+        if extra:
+            print(24*' ' + 'Extra:   {:7,}'.format(extra))
+        if mismatch:
+            print(24*' ' + 'Mismatch:{:7,}'.format(mismatch))
+
+        # upload diff report CSV file to Azure Data Lake Store
+        upload_start = default_timer()
+        datalake_upload_entity(entity)
+        upload_elapsed = default_timer() - upload_start
+        print('Upload ' + entity + '_diff to Data Lake '.ljust(29, '.') +
+              '{0:6.1f} seconds'.format(upload_elapsed))
+
+        entity_elapsed = default_timer() - start_time
+        print(entity.upper().rjust(24) +
+              ' - elapsed time:{0:6.1f} seconds'.format(entity_elapsed))
+
+    total_elapsed = default_timer() - start_time
+    print(11*' ' +
+          'Total data verification time:{:6.1f} seconds'.format(total_elapsed))
+
+def datafile_local(entity=None, filetype=None): #----------------------------<<<
+    """Returns relative path/filename for a local CSV file.
+
+    Note that today's date is included in the filename:
+    data/<entity>-<filetype>-YYYY-MM-DD.csv
+    """
+    datestr = str(datetime.datetime.now())[:10]
+    return 'data/' + entity.lower() + '-' + filetype.lower() + '-' +\
+        datestr + '.csv'
+
+def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
+    """Generate a diff report for specified entity.
+
+    If only an entity is passed, today's github/datalake data files for this
+    entity are used for the comparison, and diff results are written to
+    <entity>_diff.csv.
+
+    If masterfile/comparefile parameters are passed, those files are compared
+    and diff results are written to diff_report.csv.
+
+    returns (missing, extra, mismatch) tuple, or None if errors.
+    """
+    if entity and masterfile and comparefile:
+        return #/// diff these two files, based on entity type specified
+    if masterfile or comparefile or not entity:
+        print('ERROR: invalid arguments passed to diff_report().')
+        return
+
+    if entity.lower() == 'repo':
+        return repo_diff()
+    else:
+        print('ERROR: unknown diff_report() entity type = ' + entity)
+
 def setting(topic=None, section=None, key=None): #---------------------------<<<
     """Retrieve a private setting stored in a local .ini file.
 
@@ -57,9 +144,9 @@ def setting(topic=None, section=None, key=None): #---------------------------<<<
     Returns the value if found, None otherwise.
     """
     source_folder = os.path.dirname(os.path.realpath(__file__))
-    datafile = os.path.join(source_folder, '../_private/' + topic.lower() + '.ini')
+    inifile = os.path.join(source_folder, '../_private/' + topic.lower() + '.ini')
     config = configparser.ConfigParser()
-    config.read(datafile)
+    config.read(inifile)
     try:
         retval = config.get(section, key)
     except configparser.NoSectionError:
@@ -120,13 +207,19 @@ def datalake_dir(folder, token=None): #--------------------------------------<<<
                    filename in adlsFileSystemClient.listdir(folder)],
                   key=lambda fname: fname.lower())
 
-def datalake_download(remotefile, localfile, token=None): #------------------<<<
+def datalake_download_entity(entity=None, token=None): #---------------------<<<
     """Download a file from Azure Data Lake Store.
 
-    Note that the remote filename should be relative to the root.
-    For example: '/users/dmahugh/repo_diff.csv'
+    entity = entity type (for example, 'repo')
+    token = Oauth token for Azure Data Lake; default = token_creds()
+
+    Downloads a CSV file to be used for comparison to current GitHub API data.
     """
-    token, _ = token_creds()
+    if not token:
+        token, _ = token_creds()
+
+    localfile = datafile_local(entity=entity, filetype='datalake')
+    remotefile = datalake_filename(entity=entity)
 
     adlsAccount = setting(topic='ghiverify', section='azure', key='adls-account')
     adlsFileSystemClient = \
@@ -136,16 +229,15 @@ def datalake_download(remotefile, localfile, token=None): #------------------<<<
                               rpath=remotefile, nthreads=64, overwrite=True,
                               buffersize=4194304, blocksize=4194304)
 
-    print('Downloaded: ' + localfile)
-    print(' File size: {0:,} bytes'.format(os.stat(localfile).st_size))
+def datalake_filename(entity=None): #----------------------------------------<<<
+    """Return path/filename for the Azure Data Lake CSV file for
+    specified entity type.
 
-def datalake_get_repos(): #--------------------------------------------------<<<
-    """Retrieve the current Repo.csv data file from Azure Data Lake Store.
+    Note that we assume title-case. This is correct for Repo.csv and others,
+    but there are some exceptions to be addressed (or eliminated) in the current
+    data on Data Lake.
     """
-    file_remote = '/TabularSource2/Repo.csv'
-    datestr = str(datetime.datetime.now())[:10]
-    file_local = 'data/repo-datalake-' + datestr + '.csv'
-    datalake_download(file_remote, file_local)
+    return '/TabularSource2/' + entity.title() + '.csv'
 
 def datalake_list_accounts(dlsaMgmtClient=None): #---------------------------<<<
     """List the available Azure Data Lake storage accounts.
@@ -166,14 +258,21 @@ def datalake_list_accounts(dlsaMgmtClient=None): #---------------------------<<<
         print('Created:  ' + str(items.creation_time.date()))
         print('ID:       ' + str(items.id))
 
-def datalake_upload(localfile, remotefile, token=None): #--------------------<<<
+def datalake_upload_entity(entity=None): #-----------------------------------<<<
+    """Upload a specified entity's diff file to Azure Data Lake storage.
+    """
+    localfile = entity.lower() + '_diff.csv'
+    remotefile = '/users/dmahugh/' + localfile
+    datalake_upload_file(localfile, remotefile)
+
+def datalake_upload_file(localfile, remotefile, token=None): #---------------<<<
     """Upload a file to an Azure Data Lake Store.
 
     Note that the remote filename should be relative to the root.
     For example: '/users/dmahugh/repo_diff.csv'
     """
     if not token:
-        token, _ = aadauth()
+        token, _ = token_creds()
 
     adlsAccount = setting(topic='ghiverify', section='azure', key='adls-account')
     adlsFileSystemClient = \
@@ -183,15 +282,12 @@ def datalake_upload(localfile, remotefile, token=None): #--------------------<<<
                             rpath=remotefile, nthreads=64, overwrite=True,
                             buffersize=4194304, blocksize=4194304)
 
-    print('Uploaded:  ' + localfile)
-    print('File size: {0:,} bytes'.format(os.stat(localfile).st_size))
-
 #----------------------------------------------------------------------------<<<
 # GITHUB                                                                     <<<
 #----------------------------------------------------------------------------<<<
 
 def github_api(*, endpoint=None): #------------------------------------------<<<
-    """Call the GitHub API.
+    """Call the GitHub API with default authentication credentials.
 
     endpoint     = the HTTP endpoint to call; if it start with /, will be
                    appended to https://api.github.com
@@ -220,8 +316,6 @@ def github_api(*, endpoint=None): #------------------------------------------<<<
         else endpoint
     response = sess.get(full_endpoint, headers=headers)
 
-    print('    Endpoint: ' + endpoint)
-
     # update rate-limit settings
     try:
         _settings.last_ratelimit = int(response.headers['X-RateLimit-Limit'])
@@ -236,9 +330,10 @@ def github_api(*, endpoint=None): #------------------------------------------<<<
         _settings.last_remaining = 999999
 
     used = _settings.last_ratelimit - _settings.last_remaining
-    print('  Rate Limit: ' + str(_settings.last_remaining) + ' available, ' +
-          str(used) + ' used, ' + str(_settings.last_ratelimit) + ' total ' +
-          auth[0])
+    #/// shouldn't happen often, but need to decide how to handle rate-limit issues
+    #print('  Rate Limit: ' + str(_settings.last_remaining) + ' available, ' +
+    #      str(used) + ' used, ' + str(_settings.last_ratelimit) + ' total ' +
+    #      auth[0])
 
     return response
 
@@ -259,7 +354,7 @@ def github_data(*, endpoint=None, entity=None, fields=None): #---------------<<<
     retval = []
     for json_item in all_fields:
         retval.append(github_fields(entity=entity, jsondata=json_item,
-                                  fields=fields))
+                                    fields=fields))
     return retval
 
 def github_data_from_api(endpoint=None): #-----------------------------------<<<
@@ -330,11 +425,21 @@ def github_fields(*, entity=None, jsondata=None, fields=None): #-------------<<<
 
     return values
 
+def github_get_entity(entity=None): #----------------------------------------<<<
+    """Get live data from GitHub API for a specified entity type.
+
+    There are variations in how each entity type can be verified, so this
+    function is essentially a dispatcher to call entity-specific functions.
+    """
+    if entity.lower() == 'repo':
+        github_get_repos()
+    else:
+        print('ERROR: unknown github_get_entity() argument - ' + entity)
+
 def github_get_repos(): #----------------------------------------------------<<<
     """Retrieve repo data from GitHub API and store as CSV file.
     """
-    datestr = str(datetime.datetime.now())[:10]
-    filename = 'data/repo-github-' + datestr + '.csv'
+    filename = datafile_local('repo', 'github')
     authname = setting(topic='ghiverify', section='github', key='username')
 
     # get a list of the orgs that authname is a member of
@@ -353,9 +458,6 @@ def github_get_repos(): #----------------------------------------------------<<<
 
     sorted_data = sorted(repolist, key=data_sort)
     write_csv(sorted_data, filename) # write CSV file
-
-    print('Output file written: ' + filename)
-    print('          File size: {0:,} bytes'.format(os.stat(filename).st_size))
 
 def github_pagination(link_header): #----------------------------------------<<<
     """Parse values from the 'link' HTTP header returned by GitHub API.
@@ -438,13 +540,13 @@ def repo_diff(github=None, datalake=None): #---------------------------------<<<
     If filenames are not provided, defaults to today's files.
 
     Differences are displayed and also written to repo_diff.csv report file.
+    Returns a tuple of total missing, extra, mismatch.
     """
 
     # handle default filenames
     if not github or not datalake:
-        datestr = str(datetime.datetime.now())[:10]
-        github = 'data/repo-github-' + datestr + '.csv'
-        datalake = 'data/repo-datalake-' + datestr + '.csv'
+        github = datafile_local('repo', 'github')
+        datalake = datafile_local('repo', 'datalake')
         if not os.path.isfile(github):
             print('MISSING FILE: ' + github)
             sys.exit()
@@ -452,10 +554,6 @@ def repo_diff(github=None, datalake=None): #---------------------------------<<<
             print('MISSING FILE: ' + datalake)
             sys.exit()
 
-    print('GitHub API data file: ' + github)
-    print('Data Lake data file:  ' + datalake)
-
-    print('loading data ...')
     repos_github = repo_data(github)
     repos_datalake = repo_data(datalake)
 
@@ -480,7 +578,7 @@ def repo_diff(github=None, datalake=None): #---------------------------------<<<
         else:
             extra.append((org, repo))
 
-    print('writing output file ...')
+    # write output file
     with open('repo_diff.csv', 'w') as outfile:
         outfile.write('org,repo,issue\n')
         for org, repo in sorted(missing):
@@ -490,9 +588,7 @@ def repo_diff(github=None, datalake=None): #---------------------------------<<<
         for org, repo in sorted(mismatch):
             outfile.write(','.join([org, repo, 'mismatch']) + '\n')
 
-    print('Total missing:  {0}'.format(len(missing)))
-    print('Total extra:    {0}'.format(len(extra)))
-    print('Total mismatch: {0}'.format(len(mismatch)))
+    return (len(missing), len(extra), len(mismatch))
 
 def repo_found(dataset, org, repo): #----------------------------------------<<<
     """Check whether a dataset contains an org/repo.
@@ -524,10 +620,4 @@ def repo_include(reponame, created_at): #------------------------------------<<<
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
-    #datalake_get_repos()
-    github_get_repos()
-    #repo_diff()
-    #datalake_list_accounts()
-    #ghinsightsms_upload('repo_diff.csv', '/users/dmahugh/repo_diff.csv')
-    #for file in datalake_dir('/TabularSource2/'):
-    #    print(file)
+    daily_diff()
