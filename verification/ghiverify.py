@@ -6,23 +6,18 @@ ghiverify.py - tools to verify data integrity for GHInsights data
 """
 # Prerequisites: pip install these packages ...
 # azure, azure-mgmt-resource, azure-mgmt-datalake-store, azure-datalake-store
-
-from azure.common.credentials import ServicePrincipalCredentials
-from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
-from azure.mgmt.datalake.store.models import DataLakeStoreAccount
-from azure.datalake.store import core, lib, multithread
-
 import collections
 import configparser
 import csv
 import datetime
-import getpass
 import json
 import os
 import re
-import sys
 from timeit import default_timer
 
+from azure.common.credentials import ServicePrincipalCredentials
+from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
+from azure.datalake.store import core, lib, multithread
 import requests
 
 #----------------------------------------------------------------------------<<<
@@ -33,8 +28,6 @@ class _settings: #-----------------------------------------------------------<<<
     """This class exists to provide a namespace used for global settings.
     """
     requests_session = None # current session object from requests library
-    tot_api_calls = 0 # number of API calls made
-    tot_api_bytes = 0 # total bytes returned by these API calls
     last_ratelimit = 0 # API rate limit for the most recent API call
     last_remaining = 0 # remaining portion of rate limit after last API call
 
@@ -61,25 +54,25 @@ def daily_diff(): #----------------------------------------------------------<<<
         # download the current CSV file from Azure Data Lake Store
         download_start = default_timer()
         datalake_download_entity(entity)
-        download_elapsed = default_timer() - download_start
         print_log('Download ' + entity + '.csv from Data Lake '.ljust(27, '.') +
-                  '{0:6.1f} seconds, {1:,} bytes'.format(download_elapsed, \
+                  '{0:6.1f} seconds, {1:,} bytes'.format( \
+            default_timer() - download_start, \
             filesize(datafile_local('repo', 'datalake'))))
 
         # get current results from GitHub API for this entity
         github_start = default_timer()
         github_get_entity(entity)
-        github_elapsed = default_timer() - github_start
         print_log('Get live data from GitHub API '.ljust(40, '.') +
-                  '{0:6.1f} seconds, {1:,} bytes'.format(github_elapsed, \
+                  '{0:6.1f} seconds, {1:,} bytes'.format( \
+            default_timer() - github_start, \
             filesize(datafile_local('repo', 'github'))))
 
         # generate diff report
         diff_start = default_timer()
         missing, extra, mismatch = diff_report(entity)
-        diff_elapsed = default_timer() - diff_start
         print_log('Generate ' + entity + '_diff.csv '.ljust(27, '.') +
-                  '{0:6.1f} seconds, {1:,} bytes'.format(diff_elapsed,\
+                  '{0:6.1f} seconds, {1:,} bytes'.format( \
+            default_timer() - diff_start, \
             filesize('repo_diff.csv')))
         if missing:
             print_log(24*' ' + 'Missing: {:7,} '.format(missing) +
@@ -94,18 +87,16 @@ def daily_diff(): #----------------------------------------------------------<<<
         # upload diff report CSV file to Azure Data Lake Store
         upload_start = default_timer()
         datalake_upload_entity(entity)
-        upload_elapsed = default_timer() - upload_start
         print_log('Upload ' + entity + '_diff to Data Lake '.ljust(29, '.') +
-                  '{0:6.1f} seconds'.format(upload_elapsed))
+                  '{0:6.1f} seconds'.format(default_timer() - upload_start))
 
-        entity_elapsed = default_timer() - start_time
+        entity_elapsed = default_timer() - entity_start
         print_log(entity.upper().rjust(24) +
                   ' - elapsed time:{0:6.1f} seconds'.format(entity_elapsed))
 
     print(54*'-')
-    total_elapsed = default_timer() - start_time
     print_log('    Total elapsed time for all entities:{:6.1f} seconds'. \
-        format(total_elapsed))
+        format(default_timer() - start_time))
 
 def datafile_local(entity=None, filetype=None): #----------------------------<<<
     """Returns relative path/filename for a local CSV file.
@@ -174,16 +165,16 @@ def setting(topic=None, section=None, key=None): #---------------------------<<<
 def token_creds(): #---------------------------------------------------------<<<
     """Return token and credentials for Azure Active Directory authentication.
     """
-    tenantId = setting(topic='ghiverify', section='aad', key='tenant-id')
-    clientSecret = setting(topic='ghiverify', section='aad', key='client-secret')
-    clientId = setting(topic='ghiverify', section='aad', key='client-id')
+    tenantid = setting(topic='ghiverify', section='aad', key='tenant-id')
+    clientsecret = setting(topic='ghiverify', section='aad', key='client-secret')
+    clientid = setting(topic='ghiverify', section='aad', key='client-id')
     return (
-        lib.auth(tenant_id=tenantId,
-                 client_secret=clientSecret,
-                 client_id=clientId),
-        ServicePrincipalCredentials(client_id=clientId,
-                                    secret=clientSecret,
-                                    tenant=tenantId))
+        lib.auth(tenant_id=tenantid,
+                 client_secret=clientsecret,
+                 client_id=clientid),
+        ServicePrincipalCredentials(client_id=clientid,
+                                    secret=clientsecret,
+                                    tenant=tenantid))
 
 def write_csv(listobj, filename): #------------------------------------------<<<
     """Write list of dictionaries to a CSV file.
@@ -217,12 +208,12 @@ def datalake_dir(folder, token=None): #--------------------------------------<<<
     """
     if not token:
         token, _ = token_creds()
-    adlsAccount = setting(topic='ghiverify', section='azure', key='adls-account')
-    adlsFileSystemClient = \
-        core.AzureDLFileSystem(token, store_name=adlsAccount)
+    adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
+    adls_fs_client = \
+        core.AzureDLFileSystem(token, store_name=adls_account)
 
     return sorted([filename.split('/')[1] for
-                   filename in adlsFileSystemClient.listdir(folder)],
+                   filename in adls_fs_client.listdir(folder)],
                   key=lambda fname: fname.lower())
 
 def datalake_download_entity(entity=None, token=None): #---------------------<<<
@@ -235,7 +226,7 @@ def datalake_download_entity(entity=None, token=None): #---------------------<<<
     """
     localfile = datafile_local(entity=entity, filetype='datalake')
     remotefile = datalake_filename(entity=entity)
-    datalake_download_file(localfile, remotefile)
+    datalake_download_file(localfile, remotefile, token)
 
 def datalake_download_file(localfile, remotefile, token=None): #-------------<<<
     """Download a file from Azure Data Lake Store.
@@ -243,11 +234,11 @@ def datalake_download_file(localfile, remotefile, token=None): #-------------<<<
     if not token:
         token, _ = token_creds()
 
-    adlsAccount = setting(topic='ghiverify', section='azure', key='adls-account')
-    adlsFileSystemClient = \
-        core.AzureDLFileSystem(token, store_name=adlsAccount)
+    adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
+    adls_fs_client = \
+        core.AzureDLFileSystem(token, store_name=adls_account)
 
-    multithread.ADLDownloader(adlsFileSystemClient, lpath=localfile,
+    multithread.ADLDownloader(adls_fs_client, lpath=localfile,
                               rpath=remotefile, nthreads=64, overwrite=True,
                               buffersize=4194304, blocksize=4194304)
 
@@ -261,16 +252,16 @@ def datalake_filename(entity=None): #----------------------------------------<<<
     """
     return '/TabularSource2/' + entity.title() + '.csv'
 
-def datalake_list_accounts(dlsaMgmtClient=None): #---------------------------<<<
+def datalake_list_accounts(): #----------------------------------------------<<<
     """List the available Azure Data Lake storage accounts.
     """
-    token, credentials = token_creds()
+    _, credentials = token_creds()
 
-    subscriptionId = setting(topic='ghiverify', section='azure', key='subscription')
-    adlsAcctClient = \
-        DataLakeStoreAccountManagementClient(credentials, subscriptionId)
+    subscription_id = setting('ghiverify', 'azure', 'subscription')
+    adls_acct_client = \
+        DataLakeStoreAccountManagementClient(credentials, subscription_id)
 
-    result_list_response = adlsAcctClient.account.list()
+    result_list_response = adls_acct_client.account.list()
     result_list = list(result_list_response)
     for items in result_list:
         print('--- Azure Data Lake Storage Account ---')
@@ -296,11 +287,11 @@ def datalake_upload_file(localfile, remotefile, token=None): #---------------<<<
     if not token:
         token, _ = token_creds()
 
-    adlsAccount = setting(topic='ghiverify', section='azure', key='adls-account')
-    adlsFileSystemClient = \
-        core.AzureDLFileSystem(token, store_name=adlsAccount)
+    adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
+    adls_fs_client = \
+        core.AzureDLFileSystem(token, store_name=adls_account)
 
-    multithread.ADLUploader(adlsFileSystemClient, lpath=localfile,
+    multithread.ADLUploader(adls_fs_client, lpath=localfile,
                             rpath=remotefile, nthreads=64, overwrite=True,
                             buffersize=4194304, blocksize=4194304)
 
@@ -351,7 +342,7 @@ def github_api(*, endpoint=None): #------------------------------------------<<<
         _settings.last_ratelimit = 999999
         _settings.last_remaining = 999999
 
-    used = _settings.last_ratelimit - _settings.last_remaining
+    #used = _settings.last_ratelimit - _settings.last_remaining
     #/// shouldn't happen often, but need to decide how to handle rate-limit issues
     #print('  Rate Limit: ' + str(_settings.last_remaining) + ' available, ' +
     #      str(used) + ' used, ' + str(_settings.last_ratelimit) + ' total ' +
@@ -362,7 +353,6 @@ def github_api(*, endpoint=None): #------------------------------------------<<<
 def github_commit_count(org, repo): #----------------------------------------<<<
     """Return total number of commits for specified org/repo.
     """
-    authname = setting(topic='ghiverify', section='github', key='username')
     endpoint = 'https://api.github.com/repos/' + org + '/' + repo + '/commits'
     requests_session = requests.session()
 
@@ -488,7 +478,6 @@ def github_get_repos(): #----------------------------------------------------<<<
     """Retrieve repo data from GitHub API and store as CSV file.
     """
     filename = datafile_local('repo', 'github')
-    authname = setting(topic='ghiverify', section='github', key='username')
 
     # get a list of the orgs that authname is a member of
     templist = github_data(endpoint='/user/orgs', fields=['login'])
@@ -594,12 +583,6 @@ def repo_diff(github=None, datalake=None): #---------------------------------<<<
     if not github or not datalake:
         github = datafile_local('repo', 'github')
         datalake = datafile_local('repo', 'datalake')
-        if not os.path.isfile(github):
-            print('MISSING FILE: ' + github)
-            sys.exit()
-        if not os.path.isfile(datalake):
-            print('MISSING FILE: ' + datalake)
-            sys.exit()
 
     repos_github = repo_data(github)
     repos_datalake = repo_data(datalake)
@@ -651,18 +634,12 @@ def repo_include(reponame, created_at): #------------------------------------<<<
     Certain types of repo names are excluded based on regex expressions.
     We also don't include repos created today.
     """
-    if re.match(r'.*-pr\..{2}-.{2}.*', reponame):
-        return False
-    elif re.search(r'.*\..{2}-.{2}.*', reponame):
-        return False
-    elif re.match(r'.*-pr$', reponame):
-        return False
-    elif re.match(r'.*\.handoff.*', reponame):
-        return False
-    elif re.match(r'handback', reponame):
-        return False
-    elif re.match(r'ontent-{4}\/', reponame):
-        return False
+    excluded = [r'.*-pr\..{2}-.{2}.*', r'.*\..{2}-.{2}.*', r'.*-pr$',
+                r'.*\.handoff.*', r'handback', r'ontent-{4}\/']
+    for regex in excluded:
+        if re.match(regex, reponame):
+            return False
+
     return not created_at == str(datetime.datetime.now())[:10]
 
 #----------------------------------------------------------------------------<<<
