@@ -53,7 +53,7 @@ def daily_diff(): #----------------------------------------------------------<<<
     """
     datestr = str(datetime.datetime.now())[:10]
     start_time = default_timer()
-    print(10*'-' + ' Data Verification for ' + datestr + ' ' + 10*'-')
+    print_log(10*'-' + ' Data Verification for ' + datestr + ' ' + 10*'-')
 
     for entity in ['repo']:
         entity_start = default_timer()
@@ -62,9 +62,9 @@ def daily_diff(): #----------------------------------------------------------<<<
         download_start = default_timer()
         datalake_download_entity(entity)
         download_elapsed = default_timer() - download_start
-        print('Download ' + entity +
-              '.csv from Data Lake '.ljust(27, '.') +
-              '{0:6.1f} seconds'.format(download_elapsed))
+        print_log('Download ' + entity +
+                  '.csv from Data Lake '.ljust(27, '.') +
+                  '{0:6.1f} seconds'.format(download_elapsed))
 
         # get current results from GitHub API for this entity
         github_start = default_timer()
@@ -77,29 +77,29 @@ def daily_diff(): #----------------------------------------------------------<<<
         diff_start = default_timer()
         missing, extra, mismatch = diff_report(entity)
         diff_elapsed = default_timer() - diff_start
-        print('Generate ' + entity + '_diff.csv '.ljust(27, '.') +
-              '{0:6.1f} seconds'.format(diff_elapsed))
+        print_log('Generate ' + entity + '_diff.csv '.ljust(27, '.') +
+                  '{0:6.1f} seconds'.format(diff_elapsed))
         if missing:
-            print(24*' ' + 'Missing: {:7,}'.format(missing))
+            print_log(24*' ' + 'Missing: {:7,}'.format(missing))
         if extra:
-            print(24*' ' + 'Extra:   {:7,}'.format(extra))
+            print_log(24*' ' + 'Extra:   {:7,}'.format(extra))
         if mismatch:
-            print(24*' ' + 'Mismatch:{:7,}'.format(mismatch))
+            print_log(24*' ' + 'Mismatch:{:7,}'.format(mismatch))
 
         # upload diff report CSV file to Azure Data Lake Store
         upload_start = default_timer()
         datalake_upload_entity(entity)
         upload_elapsed = default_timer() - upload_start
-        print('Upload ' + entity + '_diff to Data Lake '.ljust(29, '.') +
-              '{0:6.1f} seconds'.format(upload_elapsed))
+        print_log('Upload ' + entity + '_diff to Data Lake '.ljust(29, '.') +
+                  '{0:6.1f} seconds'.format(upload_elapsed))
 
         entity_elapsed = default_timer() - start_time
-        print(entity.upper().rjust(24) +
-              ' - elapsed time:{0:6.1f} seconds'.format(entity_elapsed))
+        print_log(entity.upper().rjust(24) +
+                  ' - elapsed time:{0:6.1f} seconds'.format(entity_elapsed))
 
     print(54*'-')
     total_elapsed = default_timer() - start_time
-    print('    Total elapsed time for all entities:{:6.1f} seconds'. \
+    print_log('    Total elapsed time for all entities:{:6.1f} seconds'. \
         format(total_elapsed))
 
 def datafile_local(entity=None, filetype=None): #----------------------------<<<
@@ -134,6 +134,13 @@ def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
         return repo_diff()
     else:
         print('ERROR: unknown diff_report() entity type = ' + entity)
+
+def print_log(text): #-------------------------------------------------------<<<
+    """Print a a line of text and add it to ghiverify.log log file.
+    """
+    print(text)
+    with open('ghiverify.log', 'a') as fhandle:
+        fhandle.write(str(datetime.datetime.now())[:22] + ' ' + text + '\n')
 
 def setting(topic=None, section=None, key=None): #---------------------------<<<
     """Retrieve a private setting stored in a local .ini file.
@@ -625,5 +632,4 @@ def repo_include(reponame, created_at): #------------------------------------<<<
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
-    datalake_download_entity('repo')
-    #daily_diff()
+    daily_diff()
