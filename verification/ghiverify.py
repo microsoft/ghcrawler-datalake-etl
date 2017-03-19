@@ -359,11 +359,39 @@ def github_api(*, endpoint=None): #------------------------------------------<<<
 
     return response
 
-def github_data(*, endpoint=None, entity=None, fields=None): #---------------<<<
+def github_commit_count(org, repo): #----------------------------------------<<<
+    """Return total number of commits for specified org/repo.
+    """
+    authname = setting(topic='ghiverify', section='github', key='username')
+    endpoint = 'https://api.github.com/repos/' + org + '/' + repo + '/commits'
+    requests_session = requests.session()
+
+    # get first page of results
+    firstpage = requests_session.get(endpoint,\
+        headers={"Accept": "application/vnd.github.v3+json"})
+    if not firstpage.ok:
+        return str(firstpage) # 404 errors, etc.
+    pagelinks = github_pagination(firstpage)
+    json_first = json.loads(firstpage.text)
+    pagesize = len(json_first) # of items on the first page of results
+    totpages = int(pagelinks['lastpage'])
+    lastpage_url = pagelinks['lastURL']
+
+    if not lastpage_url:
+        return pagesize # only one page of results, so we're done
+
+    # get last page of results
+    lastpage = requests_session.get(lastpage_url,\
+        headers={"Accept": "application/vnd.github.v3+json"})
+    json_last = json.loads(lastpage.text)
+    lastpage_count = len(json_last) # number of items on the last page
+
+    return (pagesize * (totpages - 1)) + lastpage_count
+
+def github_data(*, endpoint=None, fields=None): #----------------------------<<<
     """Get data for specified GitHub API endpoint.
 
     endpoint     = HTTP endpoint for GitHub API call
-    entity       = entity type ('repo', 'member')
     fields       = list of fields to be returned
 
     Returns a list of dictionaries containing the specified fields.
@@ -375,8 +403,7 @@ def github_data(*, endpoint=None, entity=None, fields=None): #---------------<<<
     # extract the requested fields and return them
     retval = []
     for json_item in all_fields:
-        retval.append(github_fields(entity=entity, jsondata=json_item,
-                                    fields=fields))
+        retval.append(github_fields(jsondata=json_item, fields=fields))
     return retval
 
 def github_data_from_api(endpoint=None): #-----------------------------------<<<
@@ -413,10 +440,9 @@ def github_data_from_api(endpoint=None): #-----------------------------------<<<
 
     return payload
 
-def github_fields(*, entity=None, jsondata=None, fields=None): #-------------<<<
+def github_fields(*, jsondata=None, fields=None): #--------------------------<<<
     """Get dictionary of desired values from GitHub API JSON payload.
 
-    entity   = entity type ('repo', 'member')
     jsondata = a JSON payload returned by the GitHub API
     fields   = list of names of fields (entries) to include from the JSON data,
                or one of these shorthand values:
@@ -465,8 +491,7 @@ def github_get_repos(): #----------------------------------------------------<<<
     authname = setting(topic='ghiverify', section='github', key='username')
 
     # get a list of the orgs that authname is a member of
-    templist = github_data(endpoint='/user/orgs', entity='org',
-                           fields=['login'])
+    templist = github_data(endpoint='/user/orgs', fields=['login'])
     sortedlist = sorted([_['login'].lower() for _ in templist])
     # note that we don't include contoso* orgs
     user_orgs = [orgname for orgname in sortedlist
@@ -475,7 +500,7 @@ def github_get_repos(): #----------------------------------------------------<<<
     repolist = [] # the list of repos
     for orgid in user_orgs:
         endpoint = '/orgs/' + orgid + '/repos?per_page=100'
-        repolist.extend(github_data(endpoint=endpoint, entity='repo', \
+        repolist.extend(github_data(endpoint=endpoint, \
             fields=['owner.login', 'name', 'created_at']))
 
     sorted_data = sorted(repolist, key=data_sort)
@@ -640,6 +665,26 @@ def repo_include(reponame, created_at): #------------------------------------<<<
         return False
     return not created_at == str(datetime.datetime.now())[:10]
 
+#----------------------------------------------------------------------------<<<
+# TESTS                                                                      <<<
+#----------------------------------------------------------------------------<<<
+
+def test_commit_count(): #---------------------------------------------------<<<
+    """Test cases for github_commit_count()
+    """
+    testcases = ['microsoft/dotnet',
+                 'microsoft/vscode',
+                 'microsoft/typescript',
+                 'microsoft/xaml-standard',
+                 'microsoft/ospo-witness',
+                 'microsoft/ghcrawler-datalake-etl']
+    for orgrepo in testcases:
+        orgname = orgrepo.split('/')[0]
+        reponame = orgrepo.split('/')[1]
+        commits = github_commit_count(orgname, reponame)
+        print(orgrepo + ', total commits = {0}'.format(commits))
+
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
-    daily_diff()
+    #daily_diff()
+    test_commit_count()
