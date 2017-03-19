@@ -62,23 +62,25 @@ def daily_diff(): #----------------------------------------------------------<<<
         download_start = default_timer()
         datalake_download_entity(entity)
         download_elapsed = default_timer() - download_start
-        print_log('Download ' + entity +
-                  '.csv from Data Lake '.ljust(27, '.') +
-                  '{0:6.1f} seconds'.format(download_elapsed))
+        print_log('Download ' + entity + '.csv from Data Lake '.ljust(27, '.') +
+                  '{0:6.1f} seconds, {1:,} bytes'.format(download_elapsed, \
+            filesize(datafile_local('repo', 'datalake'))))
 
         # get current results from GitHub API for this entity
         github_start = default_timer()
         github_get_entity(entity)
         github_elapsed = default_timer() - github_start
-        print('Get live data from GitHub API '.ljust(40, '.') +
-              '{0:6.1f} seconds'.format(github_elapsed))
+        print_log('Get live data from GitHub API '.ljust(40, '.') +
+                  '{0:6.1f} seconds, {1:,} bytes'.format(github_elapsed, \
+            filesize(datafile_local('repo', 'github'))))
 
         # generate diff report
         diff_start = default_timer()
         missing, extra, mismatch = diff_report(entity)
         diff_elapsed = default_timer() - diff_start
         print_log('Generate ' + entity + '_diff.csv '.ljust(27, '.') +
-                  '{0:6.1f} seconds'.format(diff_elapsed))
+                  '{0:6.1f} seconds, {1:,} bytes'.format(diff_elapsed,\
+            filesize('repo_diff.csv')))
         if missing:
             print_log(24*' ' + 'Missing: {:7,}'.format(missing))
         if extra:
@@ -134,6 +136,11 @@ def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
         return repo_diff()
     else:
         print('ERROR: unknown diff_report() entity type = ' + entity)
+
+def filesize(filename): #----------------------------------------------------<<<
+    """Return byte size of specified file.
+    """
+    return os.stat(filename).st_size
 
 def print_log(text): #-------------------------------------------------------<<<
     """Print a a line of text and add it to ghiverify.log log file.
