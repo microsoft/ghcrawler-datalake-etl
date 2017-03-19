@@ -82,11 +82,14 @@ def daily_diff(): #----------------------------------------------------------<<<
                   '{0:6.1f} seconds, {1:,} bytes'.format(diff_elapsed,\
             filesize('repo_diff.csv')))
         if missing:
-            print_log(24*' ' + 'Missing: {:7,}'.format(missing))
+            print_log(24*' ' + 'Missing: {:7,} '.format(missing) +
+                      entity + 's')
         if extra:
-            print_log(24*' ' + 'Extra:   {:7,}'.format(extra))
+            print_log(24*' ' + 'Extra:   {:7,} '.format(extra) +
+                      entity + 's')
         if mismatch:
-            print_log(24*' ' + 'Mismatch:{:7,}'.format(mismatch))
+            print_log(24*' ' + 'Mismatch:{:7,} '.format(mismatch) +
+                      entity + 's')
 
         # upload diff report CSV file to Azure Data Lake Store
         upload_start = default_timer()
