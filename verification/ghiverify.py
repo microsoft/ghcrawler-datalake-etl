@@ -482,9 +482,8 @@ def github_get_repos(): #----------------------------------------------------<<<
     # get a list of the orgs that authname is a member of
     templist = github_data(endpoint='/user/orgs', fields=['login'])
     sortedlist = sorted([_['login'].lower() for _ in templist])
-    # note that we don't include contoso* orgs
     user_orgs = [orgname for orgname in sortedlist
-                 if not orgname.startswith('contoso')]
+                 if not orgname == 'nuget']
 
     repolist = [] # the list of repos
     for orgid in user_orgs:
@@ -663,5 +662,5 @@ def test_commit_count(): #---------------------------------------------------<<<
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
-    #daily_diff()
-    test_commit_count()
+    daily_diff()
+    #test_commit_count()
