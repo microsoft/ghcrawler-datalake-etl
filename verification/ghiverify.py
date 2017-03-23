@@ -132,6 +132,17 @@ def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
     else:
         print('ERROR: unknown diff_report() entity type = ' + entity)
 
+def documentation_repo(reponame): #------------------------------------------<<<
+    """Check repo name for whether it appears to be a documentation repo.
+    """
+    docrepos = [r'.*-pr\..{2}-.{2}.*', r'.*\..{2}-.{2}.*', r'.*-pr$',
+                r'.*\.handoff.*', r'handback', r'ontent-{4}\/']
+    for regex in docrepos:
+        if re.match(regex, reponame):
+            return True
+
+    return False
+
 def filesize(filename): #----------------------------------------------------<<<
     """Return byte size of specified file.
     """
@@ -166,13 +177,15 @@ def privaterepos(): #--------------------------------------------------------<<<
     """
     paid_orgs = ['azuread', 'azure', 'azure-samples', 'microsoft',
                  'aspnet', 'contosodev', 'contosotest']
-    filename = local_filename('repo', 'datalake')
-    myreader = csv.reader(open(filename, 'r', encoding='iso-8859-2'),
+    datafile = local_filename('repo', 'datalake')
+
+    myreader = csv.reader(open(datafile, 'r', encoding='iso-8859-2'),
                           delimiter=',', quotechar='"')
     for values in myreader:
         private = values[60]
         if not private.lower() == 'true':
             continue
+
         repo = values[3]
         org = values[4]
         created = values[5][:10]
@@ -180,11 +193,12 @@ def privaterepos(): #--------------------------------------------------------<<<
         last_update = values[93][:10]
         last_activity = max(created, last_push, last_update)
         paid = org.lower() in paid_orgs
-        print(str(paid), last_activity, org, repo)
+        doc_repo = documentation_repo(repo)
+
+        print(str(doc_repo), last_activity, org, repo)
 
         """
         /// over30 = repo over 30 days old?
-        /// set doc_repo based on regexes (move those to a documentation_repo() function)
         /// think about a general approach to bucketing by date ranges
         /// - needs to apply to both created_at and last_activity
         /// - buckets = 30, 60, 90, 180, 365
@@ -683,11 +697,8 @@ def repo_include(reponame, created_at): #------------------------------------<<<
     Certain types of repo names are excluded based on regex expressions.
     We also don't include repos created today.
     """
-    excluded = [r'.*-pr\..{2}-.{2}.*', r'.*\..{2}-.{2}.*', r'.*-pr$',
-                r'.*\.handoff.*', r'handback', r'ontent-{4}\/']
-    for regex in excluded:
-        if re.match(regex, reponame):
-            return False
+    if documentation_repo(reponame):
+        return False
 
     return not created_at == str(datetime.datetime.now())[:10]
 
