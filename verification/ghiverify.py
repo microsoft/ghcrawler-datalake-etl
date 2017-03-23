@@ -376,6 +376,20 @@ def repo_admins(org, repo): #------------------------------------------------<<<
 
     return sorted(admins)
 
+def repo_execvp(orgname, reponame): #----------------------------------------<<<
+    """Return the execvp for specified repo.
+    """
+    if not hasattr(_settings, 'repo_exec'):
+        # load dictionary first time this function is called
+        _settings.repo_exec = dict()
+        myreader = csv.reader(open('data/repoExecVP.csv', 'r'), delimiter=',', quotechar='"')
+        next(myreader, None)
+        for values in myreader:
+            if values[0] and values[1] and values[2]:
+                org_repo = values[0].lower() + '/' + values[1].lower()
+                _settings.repo_exec[org_repo] = values[2]
+    return _settings.repo_exec.get(orgname.lower() + '/' + reponame.lower(), '')
+
 def repo_execvp_voting(): #--------------------------------------------------<<<
     """Count the "votes" to determine which exec VP (Satya's directs) "owns"
     each private repo.
@@ -968,10 +982,3 @@ def test_commit_count(): #---------------------------------------------------<<<
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
     #daily_diff()
-    #test_commit_count()
-    #privaterepos()
-    #linkingdata_update()
-    #datalake_download_entity('OrganizationChart')
-    #private_repo_admins()
-    repo_execvp_voting()
-
