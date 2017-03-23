@@ -32,6 +32,23 @@ class _settings: #-----------------------------------------------------------<<<
     last_ratelimit = 0 # API rate limit for the most recent API call
     last_remaining = 0 # remaining portion of rate limit after last API call
 
+def add_execvp(): #----------------------------------------------------------<<<
+    """Add execvp column to privateRepos.csv, write output as privateRepos2.csv.
+    Note that this assumes the data/repoExecVP.csv data is current.
+    """
+    outfile = open('privateRepos2.csv', 'w')
+    myreader = csv.reader(open('privateRepos.csv', 'r'),
+                          delimiter=',', quotechar='"')
+    header = next(myreader, None)
+    outfile.write(','.join(header) + ',execvp\n')
+    for values in myreader:
+        org = values[0]
+        repo = values[1]
+        execvp = repo_execvp(org, repo)
+        outfile.write(','.join(values) + ',' + execvp + '\n')
+
+    outfile.close()
+
 def data_sort(datadict): #---------------------------------------------------<<<
     """Sort function for output lists.
 
@@ -982,3 +999,4 @@ def test_commit_count(): #---------------------------------------------------<<<
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
     #daily_diff()
+    add_execvp()
