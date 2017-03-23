@@ -212,6 +212,18 @@ def microsoft_vp(alias): #---------------------------------------------------<<<
 
     return current
 
+def ms_alias(email): #-------------------------------------------------------<<<
+    """Return Microsoft alias for an email address.
+    """
+    if not hasattr(_settings, 'email_alias'):
+        # load dictionary first time this function is called
+        _settings.email_alias = dict()
+        myreader = csv.reader(open('data/emailAlias.csv', 'r'), delimiter=',', quotechar='"')
+        next(myreader, None)
+        for values in myreader:
+            _settings.email_alias[values[0]] = values[1]
+    return _settings.email_alias.get(email.lower(), '')
+
 def ms_email(github_user): #-------------------------------------------------<<<
     """Return Microsoft email address linked to a GitHub account.
     """
@@ -221,7 +233,7 @@ def ms_email(github_user): #-------------------------------------------------<<<
         myreader = csv.reader(open('data/linkdata.csv', 'r'), delimiter=',', quotechar='"')
         next(myreader, None)
         for values in myreader:
-            _settings.linkdata[values[0].lower()] = values[1].lower()
+            _settings.linkdata[values[0]] = values[1]
     return _settings.linkdata.get(github_user.lower(), '')
 
 def orgchart_shredder(): #---------------------------------------------------<<<
@@ -877,4 +889,5 @@ if __name__ == '__main__':
     #linkingdata_update()
     #datalake_download_entity('OrganizationChart')
 
-    orgchart_shredder()
+    print(ms_alias('arnom@ntdev.microsoft.com'))
+    print(ms_alias('arno.mihm@microsoft.com'))
