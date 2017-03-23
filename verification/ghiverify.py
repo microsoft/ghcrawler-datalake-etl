@@ -195,9 +195,17 @@ def microsoft_vp(alias): #---------------------------------------------------<<<
             person, manager = line.strip().split(',')
             _settings.alias_manager[person.lower()] = manager.lower()
 
+    # the approach here is to traverse up the management chain to Satya Nadella,
+    # and return the "Satya's direct" for this employee. Note that we limit the
+    # depth of this search to 20 levels of management (a horrific concept), to
+    # avoid an infinite loop if there is bogus data that creates a circular
+    # relationship (e.g., your manager reports to you).
+    max_depth = 20
     current = alias.lower() # current person as we move up the mgmt chain
     while True:
-        #/// note risk of inifite loop here if there is a circular
+        max_depth -= 1
+        if max_depth < 1:
+            return '*unknown*'
         # relationship in the data; need to implement a max-depth concept
         mgr = _settings.alias_manager[current]
         if mgr == 'satyan':
