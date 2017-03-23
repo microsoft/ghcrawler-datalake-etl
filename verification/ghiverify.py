@@ -10,6 +10,7 @@ import collections
 import configparser
 import csv
 import datetime
+import glob
 import json
 import os
 import re
@@ -136,12 +137,61 @@ def filesize(filename): #----------------------------------------------------<<<
     """
     return os.stat(filename).st_size
 
+def local_filename(entity, source): #------------------------------------------<<<
+    """Return filename of a local data file.
+
+    entity = entity type (e.g., 'repo')
+    source = data source (e.g., 'datalake' or 'github')
+
+    Returns the most recently captured local data filename for this combination
+    of entity type and data source.
+    """
+    filename = ''
+    for fname in glob.glob('data/' + entity.lower() + '-' + source.lower() + '-*.csv'):
+        filename = fname if fname > filename else filename
+    return filename
+
 def print_log(text): #-------------------------------------------------------<<<
     """Print a a line of text and add it to ghiverify.log log file.
     """
     print(text)
     with open('ghiverify.log', 'a') as fhandle:
         fhandle.write(str(datetime.datetime.now())[:22] + ' ' + text + '\n')
+
+def privaterepos(): #--------------------------------------------------------<<<
+    """Generate privateRepos.csv file.
+
+    Currently generating this from GitHub API, next step is to make this a
+    U-SQL job to generate CSV file from the ghinsightsms Azure Data Lake Store.
+    """
+    paid_orgs = ['azuread', 'azure', 'azure-samples', 'microsoft',
+                 'aspnet', 'contosodev', 'contosotest']
+    filename = local_filename('repo', 'datalake')
+    myreader = csv.reader(open(filename, 'r', encoding='iso-8859-2'),
+                          delimiter=',', quotechar='"')
+    for values in myreader:
+        private = values[60]
+        if not private.lower() == 'true':
+            continue
+        repo = values[3]
+        org = values[4]
+        created = values[5][:10]
+        last_push = values[61][:10]
+        last_update = values[93][:10]
+        last_activity = max(created, last_push, last_update)
+        paid = org.lower() in paid_orgs
+        print(str(paid), last_activity, org, repo)
+
+        """
+        /// over30 = repo over 30 days old?
+        /// set doc_repo based on regexes (move those to a documentation_repo() function)
+        /// think about a general approach to bucketing by date ranges
+        /// - needs to apply to both created_at and last_activity
+        /// - buckets = 30, 60, 90, 180, 365
+        /// CSV header:
+        /// - org,repo,created,last_activity,over30,paid,doc_repo,last_push,last_update
+        /// - also bucketed columns for created/last_activity
+        """
 
 def setting(topic=None, section=None, key=None): #---------------------------<<<
     """Retrieve a private setting stored in a local .ini file.
@@ -662,5 +712,6 @@ def test_commit_count(): #---------------------------------------------------<<<
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
-    daily_diff()
+    #daily_diff()
     #test_commit_count()
+    privaterepos()
