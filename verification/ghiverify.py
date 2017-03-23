@@ -200,7 +200,7 @@ def microsoft_vp(alias): #---------------------------------------------------<<<
     # relationship (e.g., your manager reports to you).
     max_depth = 20
     current = alias.lower() # current person as we move up the mgmt chain
-    while True:
+    while current:
         max_depth -= 1
         if max_depth < 1:
             return '*unknown*'
@@ -221,7 +221,8 @@ def ms_alias(email): #-------------------------------------------------------<<<
         myreader = csv.reader(open('data/emailAlias.csv', 'r'), delimiter=',', quotechar='"')
         next(myreader, None)
         for values in myreader:
-            _settings.email_alias[values[0]] = values[1]
+            if values[0]:
+                _settings.email_alias[values[0]] = values[1]
     return _settings.email_alias.get(email.lower(), '')
 
 def ms_email(github_user): #-------------------------------------------------<<<
@@ -233,7 +234,8 @@ def ms_email(github_user): #-------------------------------------------------<<<
         myreader = csv.reader(open('data/linkdata.csv', 'r'), delimiter=',', quotechar='"')
         next(myreader, None)
         for values in myreader:
-            _settings.linkdata[values[0]] = values[1]
+            if values[0]:
+                _settings.linkdata[values[0]] = values[1]
     return _settings.linkdata.get(github_user.lower(), '')
 
 def orgchart_shredder(): #---------------------------------------------------<<<
@@ -275,6 +277,31 @@ def print_log(text): #-------------------------------------------------------<<<
     print(text)
     with open('ghiverify.log', 'a') as fhandle:
         fhandle.write(str(datetime.datetime.now())[:22] + ' ' + text + '\n')
+
+def private_repo_admins(): #-------------------------------------------------<<<
+    """Write data file of all admin users for private repos.
+
+    Note this is hard-coded to working with ./privateRepos.csv, should make
+    this more re-usable later.
+    """
+    outfile = 'data/privateRepoAdmins.csv'
+    open(outfile, 'w').write('org,repo,githubuser,ms_email,ms_alias,exec\n')
+    myreader = csv.reader(open('privateRepos.csv', 'r'),
+                          delimiter=',', quotechar='"')
+    next(myreader, None)
+
+    for values in myreader:
+        org = values[0]
+        repo = values[1]
+        print(org, repo)
+        adminlist = repo_admins(org, repo)
+        for githubuser in adminlist:
+            email = ms_email(githubuser)
+            alias = ms_alias(email)
+            execvp = microsoft_vp(alias)
+            if execvp: # only write a record if we an execvp for this user
+                outdata = [org, repo, githubuser, email, alias, execvp]
+                open(outfile, 'a').write(','.join(outdata) + '\n')
 
 def privaterepos(): #--------------------------------------------------------<<<
     """Generate privateRepos.csv file.
@@ -323,6 +350,64 @@ def privaterepos(): #--------------------------------------------------------<<<
 
     outfile.close()
     print('{0} rows written to privateRepos.csv'.format(rows_written))
+
+def repo_admins(org, repo): #------------------------------------------------<<<
+    """Return set of GitHub usernames that have admin rights to specified repo.
+    """
+    admins = set() # lower-case GitHub usernames for all repo admins
+
+    # get members of teams that have admin access
+    teamdata = github_data_from_api('/repos/' + org + '/' + repo + '/teams')
+    for team in teamdata:
+        if team['permission'] == 'admin':
+            members = github_data_from_api('/teams/' + str(team['id']) + '/members')
+            for member in members:
+                admins.add(member['login'].lower())
+
+    # get external contributors
+    contributors = github_data_from_api('/repos/' + org + '/' + repo + '/contributors')
+    for contributor in contributors:
+        admins.add(contributor['login'])
+
+    # get org owners/admins
+    orgowners = github_data_from_api('/orgs/' + org + '/members?role=admin')
+    for owner in orgowners:
+        admins.add(owner['login'])
+
+    return sorted(admins)
+
+def repo_execvp_voting(): #--------------------------------------------------<<<
+    """Count the "votes" to determine which exec VP (Satya's directs) "owns"
+    each private repo.
+
+    Note this is hard-coded to specific filenames. Make this more generic.
+    """
+    infile = 'data/privateRepoAdmins.csv' # assumed to be sorted on org/repo
+
+    # the votes data structure is an OrderedDict (in org/repo order) that
+    # contains a dictionary of voting totals for each repo
+    votes = collections.OrderedDict()
+    myreader = csv.reader(open(infile, 'r'), delimiter=',', quotechar='"')
+    next(myreader, None)
+    for values in myreader:
+        org_repo = values[0] + '/' + values[1]
+        execvp = values[5]
+        if org_repo in votes:
+            if execvp in votes[org_repo]:
+                votes[org_repo][execvp] += 1
+            else:
+                votes[org_repo][execvp] = 1
+        else:
+            votes[org_repo] = dict()
+            votes[org_repo][execvp] = 1
+
+    # write output file
+    outfile = 'data/repoExecVP.csv'
+    open(outfile, 'w').write('org,repo,execvp\n`')
+    for org_repo in votes:
+        execvp = max(votes[org_repo], key=votes[org_repo].get)
+        open(outfile, 'a').write(org_repo.replace('/', ',') +
+                                 ',' + execvp + '\n')
 
 def setting(topic=None, section=None, key=None): #---------------------------<<<
     """Retrieve a private setting stored in a local .ini file.
@@ -633,7 +718,7 @@ def github_data_from_api(endpoint=None): #-----------------------------------<<<
 
     while True:
         response = github_api(endpoint=page_endpoint)
-        if response.ok:
+        if response.ok and response.text:
             thispage = json.loads(response.text)
             # commit data is handled differently from everything else, because
             # the sheer volume (e.g., over 100K commits in a repo) causes out of
@@ -645,7 +730,6 @@ def github_data_from_api(endpoint=None): #-----------------------------------<<<
                 payload.extend(thispage)
         else:
             print('ERROR: bad response from {0}, status = {1}'.format(endpoint, str(response)))
-
 
         pagelinks = github_pagination(response)
         page_endpoint = pagelinks['nextURL']
@@ -888,6 +972,6 @@ if __name__ == '__main__':
     #privaterepos()
     #linkingdata_update()
     #datalake_download_entity('OrganizationChart')
+    #private_repo_admins()
+    repo_execvp_voting()
 
-    print(ms_alias('arnom@ntdev.microsoft.com'))
-    print(ms_alias('arno.mihm@microsoft.com'))
