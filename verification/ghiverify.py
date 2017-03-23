@@ -180,10 +180,8 @@ def local_filename(entity, source): #----------------------------------------<<<
     Returns the most recently captured local data filename for this combination
     of entity type and data source.
     """
-    filename = ''
-    for fname in glob.glob('data/' + entity.lower() + '-' + source.lower() + '-*.csv'):
-        filename = fname if fname > filename else filename
-    return filename
+    return max(glob.glob('data/' + entity.lower() + '-' + source.lower() +
+                         '-*.csv'))
 
 def microsoft_vp(alias): #---------------------------------------------------<<<
     """Return the alias of Satya's direct for a specified Microsoft alias.
@@ -225,6 +223,39 @@ def ms_email(github_user): #-------------------------------------------------<<<
         for values in myreader:
             _settings.linkdata[values[0].lower()] = values[1].lower()
     return _settings.linkdata.get(github_user.lower(), '')
+
+def orgchart_shredder(): #---------------------------------------------------<<<
+    """Shred most recent orgchart data file into CSVs used for lookups.
+    """
+    # get most recent orgchart data filename
+    orgchartdata = max(glob.glob('data/organizationchart-datalake-*.csv'))
+
+    outfile1 = open('data/aliasManager.csv', 'w')
+    outfile2 = open('data/emailAlias.csv', 'w')
+    # emails_written is the unique set of email addresses that have been
+    # processed, and is used to avoid writing duplicate records to outfile2
+    emails_written = set()
+    count = 0
+    myreader = csv.reader(open(orgchartdata, 'r', encoding='iso-8859-2'),
+                          delimiter=',', quotechar='"')
+    for values in myreader:
+        count += 1
+        alias = values[1].lower()
+        #fullname = values[2]
+        manager = values[3].lower()
+        email1 = values[4].lower()
+        email2 = values[5].lower()
+        outfile1.write(alias + ',' + manager + '\n')
+        if not email1 in emails_written:
+            outfile2.write(email1 + ',' + alias + '\n')
+            emails_written.add(email1)
+        if not email2 in emails_written:
+            outfile2.write(email2 + ',' + alias + '\n')
+            emails_written.add(email2)
+
+    outfile1.close()
+    outfile2.close()
+    print('{0} orgchart records processed.'.format(count))
 
 def print_log(text): #-------------------------------------------------------<<<
     """Print a a line of text and add it to ghiverify.log log file.
@@ -845,3 +876,5 @@ if __name__ == '__main__':
     #privaterepos()
     #linkingdata_update()
     #datalake_download_entity('OrganizationChart')
+
+    orgchart_shredder()
