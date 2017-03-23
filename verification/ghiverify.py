@@ -4,16 +4,16 @@ Licensed under the MIT License.
 
 ghiverify.py - tools to verify data integrity for GHInsights data
 """
-# Prerequisites: pip install these packages ...
-# azure, azure-mgmt-resource, azure-mgmt-datalake-store, azure-datalake-store
 import collections
 import configparser
 import csv
 import datetime
 import glob
+import gzip
 import json
 import os
 import re
+import sys
 from timeit import default_timer
 
 from azure.common.credentials import ServicePrincipalCredentials
@@ -109,6 +109,29 @@ def datafile_local(entity=None, filetype=None): #----------------------------<<<
     return 'data/' + entity.lower() + '-' + filetype.lower() + '-' +\
         datestr + '.csv'
 
+def date_range(datestr): #---------------------------------------------------<<<
+    """Convert date string (YYYY-MM-DD) to one of the following date-range
+    categories.
+    """
+    days_old = days_since(datestr)
+    if days_old <= 30:
+        return '030'
+    elif days_old <= 60:
+        return '060'
+    elif days_old <= 90:
+        return '090'
+    elif days_old <= 180:
+        return '180'
+    elif days_old <= 365:
+        return '365'
+    return 'older'
+
+def days_since(datestr): #---------------------------------------------------<<<
+    """Return # days since a date in YYYY-MM-DD format.
+    """
+    return (datetime.datetime.today() -
+            datetime.datetime.strptime(datestr, '%Y-%m-%d')).days
+
 def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
     """Generate a diff report for specified entity.
 
@@ -148,7 +171,7 @@ def filesize(filename): #----------------------------------------------------<<<
     """
     return os.stat(filename).st_size
 
-def local_filename(entity, source): #------------------------------------------<<<
+def local_filename(entity, source): #----------------------------------------<<<
     """Return filename of a local data file.
 
     entity = entity type (e.g., 'repo')
@@ -161,6 +184,39 @@ def local_filename(entity, source): #------------------------------------------<
     for fname in glob.glob('data/' + entity.lower() + '-' + source.lower() + '-*.csv'):
         filename = fname if fname > filename else filename
     return filename
+
+def microsoft_vp(alias): #---------------------------------------------------<<<
+    """Return the alias of Satya's direct for a specified Microsoft alias.
+    """
+    if not hasattr(_settings, 'alias_manager'):
+        # load dictionary first time this function is called
+        _settings.alias_manager = dict()
+        for line in open('data/aliasManager.csv', 'r').readlines():
+            person, manager = line.strip().split(',')
+            _settings.alias_manager[person.lower()] = manager.lower()
+
+    current = alias.lower() # current person as we move up the mgmt chain
+    while True:
+        #/// note risk of inifite loop here if there is a circular
+        # relationship in the data; need to implement a max-depth concept
+        mgr = _settings.alias_manager[current]
+        if mgr == 'satyan':
+            break # current = satya's direct
+        current = mgr # move up to the next manager
+
+    return current
+
+def ms_email(github_user): #-------------------------------------------------<<<
+    """Return Microsoft email address linked to a GitHub account.
+    """
+    if not hasattr(_settings, 'linkdata'):
+        # load dictionary first time this function is called
+        _settings.linkdata = dict()
+        myreader = csv.reader(open('data/linkdata.csv', 'r'), delimiter=',', quotechar='"')
+        next(myreader, None)
+        for values in myreader:
+            _settings.linkdata[values[0].lower()] = values[1].lower()
+    return _settings.linkdata.get(github_user.lower(), '')
 
 def print_log(text): #-------------------------------------------------------<<<
     """Print a a line of text and add it to ghiverify.log log file.
@@ -178,34 +234,44 @@ def privaterepos(): #--------------------------------------------------------<<<
     paid_orgs = ['azuread', 'azure', 'azure-samples', 'microsoft',
                  'aspnet', 'contosodev', 'contosotest']
     datafile = local_filename('repo', 'datalake')
+    outfile = open('privateRepos.csv', 'w')
+    outfile.write('org,repo,created,paid,age,inactive,days_old,' +
+                  'days_inactive,last_activity,over30,doc_repo,' +
+                  'last_push,last_update\n')
+    rows_written = 0
 
     myreader = csv.reader(open(datafile, 'r', encoding='iso-8859-2'),
                           delimiter=',', quotechar='"')
     for values in myreader:
         private = values[60]
         if not private.lower() == 'true':
-            continue
+            continue # only include private repos
 
         repo = values[3]
         org = values[4]
+        if org.lower() == 'msftberlin' or org.lower().startswith('6wunder'):
+            continue # don't include known internal engineering groups
+
         created = values[5][:10]
         last_push = values[61][:10]
         last_update = values[93][:10]
         last_activity = max(created, last_push, last_update)
         paid = org.lower() in paid_orgs
         doc_repo = documentation_repo(repo)
+        days_old = days_since(created)
+        days_inactive = days_since(last_activity)
+        over30 = days_old > 30
+        age = date_range(created)
+        inactive = date_range(last_activity)
+        data = [org, repo, created, str(paid), '"' + age + '"',
+                '"' + inactive + '"', str(days_old), str(days_inactive),
+                last_activity, str(over30), str(doc_repo), last_push,
+                last_update]
+        outfile.write(','.join(data) + '\n')
+        rows_written += 1
 
-        print(str(doc_repo), last_activity, org, repo)
-
-        """
-        /// over30 = repo over 30 days old?
-        /// think about a general approach to bucketing by date ranges
-        /// - needs to apply to both created_at and last_activity
-        /// - buckets = 30, 60, 90, 180, 365
-        /// CSV header:
-        /// - org,repo,created,last_activity,over30,paid,doc_repo,last_push,last_update
-        /// - also bucketed columns for created/last_activity
-        """
+    outfile.close()
+    print('{0} rows written to privateRepos.csv'.format(rows_written))
 
 def setting(topic=None, section=None, key=None): #---------------------------<<<
     """Retrieve a private setting stored in a local .ini file.
@@ -262,7 +328,50 @@ def write_csv(listobj, filename): #------------------------------------------<<<
     csvfile.close()
 
 #----------------------------------------------------------------------------<<<
-# AZURE DATA LAKE                                                            <<<
+# AZURE                                                                      <<<
+#----------------------------------------------------------------------------<<<
+
+def latestlinkdata(): #------------------------------------------------------<<<
+    """Returns the most recent filename for Azure blobs that contain linkdata.
+    """
+    azure_acct = setting('azure','linkingdata', 'account')
+    azure_key = setting('azure','linkingdata', 'key')
+    azure_container = setting('azure','linkingdata', 'container')
+
+    from azure.storage.blob import BlockBlobService
+    block_blob_service = BlockBlobService(account_name=azure_acct, account_key=azure_key)
+    blobs = block_blob_service.list_blobs(azure_container)
+    latest = ''
+    for blob in blobs:
+        latest = blob.name if blob.name > latest else latest
+    return latest if latest else None
+
+def linkingdata_update(): #--------------------------------------------------<<<
+    """Update local copy of GitHub-Microsoft account linking data.
+    """
+    azure_acct = setting('azure', 'linkingdata', 'account')
+    azure_key = setting('azure', 'linkingdata', 'key')
+    azure_container = setting('azure', 'linkingdata', 'container')
+    azure_blobname = latestlinkdata()
+    gzfile = 'data/' + azure_blobname
+    print('retrieving link data: ' + azure_blobname)
+
+    # download the Azure blob
+    from azure.storage.blob import BlockBlobService
+    block_blob_service = BlockBlobService(account_name=azure_acct, account_key=azure_key)
+    block_blob_service.get_blob_to_path(azure_container, azure_blobname, gzfile)
+
+    # decompress the JSON file and write to linkdata.csv
+    outfile = 'data/linkdata.csv'
+    with open(outfile, 'w') as fhandle:
+        fhandle.write('githubuser,email\n')
+        for line in gzip.open(gzfile).readlines():
+            jsondata = json.loads(line.decode('utf-8'))
+            outline = jsondata['ghu'] + ',' + jsondata['aadupn']
+            fhandle.write(outline + '\n')
+
+#----------------------------------------------------------------------------<<<
+# DATA LAKE                                                                  <<<
 #----------------------------------------------------------------------------<<<
 
 def datalake_dir(folder, token=None): #--------------------------------------<<<
@@ -286,7 +395,7 @@ def datalake_download_entity(entity=None, token=None): #---------------------<<<
     entity = entity type (for example, 'repo')
     token = Oauth token for Azure Data Lake; default = token_creds()
 
-    Downloads a CSV file to be used for comparison to current GitHub API data.
+    Downloads a CSV file from the ghinsightsms Azure Data Lake Store.
     """
     localfile = datafile_local(entity=entity, filetype='datalake')
     remotefile = datalake_filename(entity=entity)
@@ -314,7 +423,7 @@ def datalake_filename(entity=None): #----------------------------------------<<<
     but there are some exceptions to be addressed (or eliminated) in the current
     data on Data Lake.
     """
-    return '/TabularSource2/' + entity.title() + '.csv'
+    return '/TabularSource2/' + entity + '.csv'
 
 def datalake_list_accounts(): #----------------------------------------------<<<
     """List the available Azure Data Lake storage accounts.
@@ -725,4 +834,6 @@ def test_commit_count(): #---------------------------------------------------<<<
 if __name__ == '__main__':
     #daily_diff()
     #test_commit_count()
-    privaterepos()
+    #privaterepos()
+    #linkingdata_update()
+    #datalake_download_entity('OrganizationChart')
