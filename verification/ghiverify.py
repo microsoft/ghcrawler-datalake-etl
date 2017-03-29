@@ -18,7 +18,7 @@ from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
 from azure.datalake.store import core, lib, multithread
 import requests
 
-from dougerino import days_since, dicts2csv, filesize, github_pagination, setting
+from dougerino import days_since, dicts2csv, filesize, github_allpages, github_pagination, setting
 
 #----------------------------------------------------------------------------<<<
 # MISCELLANEOUS                                                              <<<
@@ -362,20 +362,20 @@ def repo_admins(org, repo): #------------------------------------------------<<<
     admins = set() # lower-case GitHub usernames for all repo admins
 
     # get members of teams that have admin access
-    teamdata = github_data_from_api('/repos/' + org + '/' + repo + '/teams')
+    teamdata = github_allpages('/repos/' + org + '/' + repo + '/teams')
     for team in teamdata:
         if team['permission'] == 'admin':
-            members = github_data_from_api('/teams/' + str(team['id']) + '/members')
+            members = github_allpages('/teams/' + str(team['id']) + '/members')
             for member in members:
                 admins.add(member['login'].lower())
 
     # get external contributors
-    contributors = github_data_from_api('/repos/' + org + '/' + repo + '/contributors')
+    contributors = github_allpages('/repos/' + org + '/' + repo + '/contributors')
     for contributor in contributors:
         admins.add(contributor['login'])
 
     # get org owners/admins
-    orgowners = github_data_from_api('/orgs/' + org + '/members?role=admin')
+    orgowners = github_allpages('/orgs/' + org + '/members?role=admin')
     for owner in orgowners:
         admins.add(owner['login'])
 
@@ -587,57 +587,6 @@ def datalake_upload_file(localfile, remotefile, token=None): #---------------<<<
 # GITHUB                                                                     <<<
 #----------------------------------------------------------------------------<<<
 
-def github_api(*, endpoint=None): #------------------------------------------<<<
-    """Call the GitHub API with default authentication credentials.
-
-    endpoint     = the HTTP endpoint to call; if it start with /, will be
-                   appended to https://api.github.com
-
-    Returns the response object.
-
-    NOTE: sends the Accept header to use version V3 of the GitHub API. This can
-    be explicitly overridden by passing a different Accept header if desired.
-    """
-
-    auth = (setting(topic='ghiverify', section='github', key='username'),
-            setting(topic='ghiverify', section='github', key='pat'))
-
-    # pass the GitHub API V3 Accept header
-    headers = {"Accept": "application/vnd.github.v3+json"}
-
-    # make the API call
-    if _settings.requests_session:
-        sess = _settings.requests_session
-    else:
-        sess = requests.session()
-        _settings.requests_session = sess
-
-    sess.auth = auth
-    full_endpoint = 'https://api.github.com' + endpoint if endpoint[0] == '/' \
-        else endpoint
-    response = sess.get(full_endpoint, headers=headers)
-
-    # update rate-limit settings
-    try:
-        _settings.last_ratelimit = int(response.headers['X-RateLimit-Limit'])
-        _settings.last_remaining = int(response.headers['X-RateLimit-Remaining'])
-    except KeyError:
-        # This is the strange and rare case (which we've encountered) where
-        # an API call that normally returns the rate-limit headers doesn't
-        # return them. Since these values are only used for monitoring, we
-        # use nonsensical values here that will show it happened, but won't
-        # crash a long-running process.
-        _settings.last_ratelimit = 999999
-        _settings.last_remaining = 999999
-
-    #used = _settings.last_ratelimit - _settings.last_remaining
-    #/// shouldn't happen often, but need to decide how to handle rate-limit issues
-    #print('  Rate Limit: ' + str(_settings.last_remaining) + ' available, ' +
-    #      str(used) + ' used, ' + str(_settings.last_ratelimit) + ' total ' +
-    #      auth[0])
-
-    return response
-
 def github_commit_count(org, repo): #----------------------------------------<<<
     """Return total number of commits for specified org/repo.
     """
@@ -676,46 +625,13 @@ def github_data(*, endpoint=None, fields=None): #----------------------------<<<
     Returns a complete data set - if this endpoint does pagination, all pages
     are retrieved and aggregated.
     """
-    all_fields = github_data_from_api(endpoint=endpoint)
+    all_fields = github_allpages(endpoint=endpoint)
 
     # extract the requested fields and return them
     retval = []
     for json_item in all_fields:
         retval.append(github_fields(jsondata=json_item, fields=fields))
     return retval
-
-def github_data_from_api(endpoint=None): #-----------------------------------<<<
-    """Get data from GitHub REST API.
-
-    endpoint     = HTTP endpoint for GitHub API call
-
-    Returns the data as a list of dictionaries. Pagination is handled by this
-    function, so the complete data set is returned.
-    """
-    payload = [] # the full data set (all fields, all pages)
-    page_endpoint = endpoint # endpoint of each page in the loop below
-
-    while True:
-        response = github_api(endpoint=page_endpoint)
-        if response.ok and response.text:
-            thispage = json.loads(response.text)
-            # commit data is handled differently from everything else, because
-            # the sheer volume (e.g., over 100K commits in a repo) causes out of
-            # memory errors if all fields are returned.
-            if 'commit' in endpoint:
-                minimized = [_['commit'] for _ in thispage]
-                payload.extend(minimized)
-            else:
-                payload.extend(thispage)
-        else:
-            print('ERROR: bad response from {0}, status = {1}'.format(endpoint, str(response)))
-
-        pagelinks = github_pagination(response)
-        page_endpoint = pagelinks['nextURL']
-        if not page_endpoint:
-            break # no more results to process
-
-    return payload
 
 def github_fields(*, jsondata=None, fields=None): #--------------------------<<<
     """Get dictionary of desired values from GitHub API JSON payload.
@@ -908,4 +824,5 @@ def test_commit_count(): #---------------------------------------------------<<<
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
     #daily_diff()
-    test_commit_count()
+    #test_commit_count()
+    print(str(repo_admins('microsoft', 'ghcrawler-datalake-etl')))
