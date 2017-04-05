@@ -11,14 +11,16 @@ import glob
 import gzip
 import json
 import re
+import sys
 from timeit import default_timer
 
-from azure.common.credentials import ServicePrincipalCredentials
-from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
-from azure.datalake.store import core, lib, multithread
 import requests
 
-from dougerino import days_since, dicts2csv, filesize, github_allpages, github_pagination, setting
+from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
+from azure.datalake.store import core, lib, multithread
+
+from dougerino import azure_datalake_token, days_since, dicts2csv, filesize
+from dougerino import github_allpages, github_pagination, setting
 
 #----------------------------------------------------------------------------<<<
 # MISCELLANEOUS                                                              <<<
@@ -155,7 +157,7 @@ def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
     returns (missing, extra, mismatch) tuple, or None if errors.
     """
     if entity and masterfile and comparefile:
-        return #/// diff these two files, based on entity type specified
+        return # TO DO: diff these two files, based on entity type specified
     if masterfile or comparefile or not entity:
         print('ERROR: invalid arguments passed to diff_report().')
         return
@@ -175,6 +177,20 @@ def documentation_repo(reponame): #------------------------------------------<<<
             return True
 
     return False
+
+def endpoint_for_pageno(endpoint, pageno): #--------------------------------<<<
+    """Return the endpoint for a specified page # of the paginated result set,
+    based on a well-formed endpoint for a (any) page and a desired pageno."""
+    root, _ = endpoint.split('&')
+    return root + '&page=' + str(pageno)
+
+def endpoint_to_pageno(endpoint): #------------------------------------------<<<
+    """Determine page # within a paginated result set, based on the endpoint
+    that was hit to return the current page."""
+    parms = endpoint.split('&')
+    if len(parms) < 2:
+        return 1
+    return int(parms[-1].split('=')[-1])
 
 def local_filename(entity, source): #----------------------------------------<<<
     """Return filename of a local data file.
@@ -428,19 +444,37 @@ def repo_execvp_voting(): #--------------------------------------------------<<<
         open(outfile, 'a').write(org_repo.replace('/', ',') +
                                  ',' + execvp + '\n')
 
-def token_creds(): #---------------------------------------------------------<<<
-    """Return token and credentials for Azure Active Directory authentication.
-    """
-    tenantid = setting(topic='ghiverify', section='aad', key='tenant-id')
-    clientsecret = setting(topic='ghiverify', section='aad', key='client-secret')
-    clientid = setting(topic='ghiverify', section='aad', key='client-id')
-    return (
-        lib.auth(tenant_id=tenantid,
-                 client_secret=clientsecret,
-                 client_id=clientid),
-        ServicePrincipalCredentials(client_id=clientid,
-                                    secret=clientsecret,
-                                    tenant=tenantid))
+def repototals_asofdate(rawdata, totfile, asofdate): #------------------------<<<
+    """Generate a file with total issues, pullrequests, commits for each repo
+    as of specified date."""
+    tot_issues = dict()
+    tot_prs = dict()
+    tot_commits = dict()
+    myreader = csv.reader(open(rawdata, 'r'), delimiter=',', quotechar='"')
+    for values in myreader:
+        thedate = values[0]
+        if thedate > asofdate:
+            continue
+        orgrepo = values[1]
+        issues = int(values[2])
+        prs = int(values[3])
+        commits = int(values[4])
+        if orgrepo in tot_issues:
+            tot_issues[orgrepo] += issues
+        else:
+            tot_issues[orgrepo] = issues
+        if orgrepo in tot_prs:
+            tot_prs[orgrepo] += prs
+        else:
+            tot_prs[orgrepo] = prs
+        if orgrepo in tot_commits:
+            tot_commits[orgrepo] += commits
+        else:
+            tot_commits[orgrepo] = commits
+    with open(totfile, 'w') as fhandle:
+        for orgrepo in tot_issues:
+            fhandle.write(','.join([orgrepo, str(tot_issues[orgrepo]), \
+                str(tot_prs[orgrepo]), str(tot_commits[orgrepo])]) + '\n')
 
 #----------------------------------------------------------------------------<<<
 # AZURE                                                                      <<<
@@ -449,9 +483,9 @@ def token_creds(): #---------------------------------------------------------<<<
 def latestlinkdata(): #------------------------------------------------------<<<
     """Returns the most recent filename for Azure blobs that contain linkdata.
     """
-    azure_acct = setting('azure','linkingdata', 'account')
-    azure_key = setting('azure','linkingdata', 'key')
-    azure_container = setting('azure','linkingdata', 'container')
+    azure_acct = setting('azure', 'linkingdata', 'account')
+    azure_key = setting('azure', 'linkingdata', 'key')
+    azure_container = setting('azure', 'linkingdata', 'container')
 
     from azure.storage.blob import BlockBlobService
     block_blob_service = BlockBlobService(account_name=azure_acct, account_key=azure_key)
@@ -495,7 +529,7 @@ def datalake_dir(folder, token=None): #--------------------------------------<<<
     Returns a list of filenames.
     """
     if not token:
-        token, _ = token_creds()
+        token, _ = azure_datalake_token('ghiverify')
     adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
     adls_fs_client = \
         core.AzureDLFileSystem(token, store_name=adls_account)
@@ -508,7 +542,7 @@ def datalake_download_entity(entity=None, token=None): #---------------------<<<
     """Download specified entity type's CSV file from ghinsights Data Lake store.
 
     entity = entity type (for example, 'repo')
-    token = Oauth token for Azure Data Lake; default = token_creds()
+    token = Oauth token for Azure Data Lake; default = azure_datalake_token('ghiverify')
 
     Downloads a CSV file from the ghinsightsms Azure Data Lake Store.
     """
@@ -520,7 +554,7 @@ def datalake_download_file(localfile, remotefile, token=None): #-------------<<<
     """Download a file from Azure Data Lake Store.
     """
     if not token:
-        token, _ = token_creds()
+        token, _ = azure_datalake_token('ghiverify')
 
     adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
     adls_fs_client = \
@@ -543,7 +577,7 @@ def datalake_filename(entity=None): #----------------------------------------<<<
 def datalake_list_accounts(): #----------------------------------------------<<<
     """List the available Azure Data Lake storage accounts.
     """
-    _, credentials = token_creds()
+    _, credentials = azure_datalake_token('ghiverify')
 
     subscription_id = setting('ghiverify', 'azure', 'subscription')
     adls_acct_client = \
@@ -573,7 +607,7 @@ def datalake_upload_file(localfile, remotefile, token=None): #---------------<<<
     For example: '/users/dmahugh/repo_diff.csv'
     """
     if not token:
-        token, _ = token_creds()
+        token, _ = azure_datalake_token('ghiverify')
 
     adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
     adls_fs_client = \
@@ -583,15 +617,186 @@ def datalake_upload_file(localfile, remotefile, token=None): #---------------<<<
                             rpath=remotefile, nthreads=64, overwrite=True,
                             buffersize=4194304, blocksize=4194304)
 
+def datalake_verification_download(): #--------------------------------------<<<
+    """Download the verification data (daily totals for various entities).
+    """
+    datestr = str(datetime.datetime.now())[:10]
+    remotefile = '/TabularSource2/verification_activities.csv'
+    localfile = 'data/verification-datalake-' + datestr + '.csv'
+    datalake_download_file(localfile, remotefile, token=None)
+
 #----------------------------------------------------------------------------<<<
 # GITHUB                                                                     <<<
 #----------------------------------------------------------------------------<<<
 
-def github_commit_count(org, repo): #----------------------------------------<<<
-    """Return total number of commits for specified org/repo.
+def commits_asofdate(org, repo, asofdate): #---------------------------------<<<
+    """Return cumulative # of commits for an org/repo as of a date.
+
+    This is an optimized approach that is based on the assumption that there
+    are relatively few commits after asofdate. Performance should be good for
+    recent asofdate values.
     """
+    requests_session = requests.session()
+    requests_session.auth = (setting('ghiverify', 'github', 'username'),
+                             setting('ghiverify', 'github', 'pat'))
+    v3api = {"Accept": "application/vnd.github.v3+json"}
+
+    # handle first page
+    endpoint = 'https://api.github.com/repos/' + org + '/' + repo + \
+        '/commits?per_page=100&page=1'
+    firstpage = requests_session.get(endpoint, headers=v3api)
+    pagelinks = github_pagination(firstpage)
+    totpages = int(pagelinks['lastpage'])
+    lastpage_url = pagelinks['lastURL']
+    jsondata = json.loads(firstpage.text)
+    commits_firstpage = len([commit for commit in jsondata \
+        if commit['commit']['committer']['date'][:10] <= asofdate])
+    if not lastpage_url:
+        # just one page of results for this repo
+        return commits_firstpage
+
+    # handle last page
+    lastpage = requests_session.get(lastpage_url, headers=v3api)
+    commits_lastpage = len([commit for commit in json.loads(lastpage.text) \
+        if commit['commit']['committer']['date'][:10] <= asofdate])
+    if not commits_lastpage:
+        return 0 # there are no commits before asofdate for this repo
+
+    # scan back from first page to find start of the desired date range
+    pageno = 1
+    while jsondata[-1]['commit']['committer']['date'][:10] > asofdate:
+        pageno += 1
+        endpoint = endpoint_for_pageno(endpoint, pageno)
+        thispage = requests_session.get(endpoint, headers=v3api)
+        jsondata = json.loads(thispage.text)
+        commits_firstpage = len([commit for commit in jsondata \
+            if commit['commit']['committer']['date'][:10] <= asofdate])
+
+    return (totpages - pageno - 1) * 100 + commits_firstpage + commits_lastpage
+
+def commit_count_date(org, repo, thedate, datasource): #---------------------<<<
+    """Returns commit count for a specified date.
+
+    datasource = 'g' for GitHub API, 'c' for local CSV file (from ADLS)
+    """
+    if 'c' in datasource.lower():
+        retval = 0
+        datafile = 'verification_activities_repo.csv'
+        myreader = csv.reader(open(datafile, 'r'), delimiter=',', quotechar='"')
+        for values in myreader:
+            if values[1] == 'unknown':
+                continue #/// what do these mean?
+            this_date = values[0]
+            this_org, this_repo = values[1].lower().split('/')
+            issues = values[2]
+            pullrequests = values[3]
+            commits = values[4]
+            if thedate == this_date and this_org == org.lower() and this_repo == repo.lower():
+                retval = int(commits)
+                break
+    else:
+        retval = commit_count_date_github(org, repo, thedate)
+    return retval
+
+def commit_count_date_github(org, repo, thedate): #--------------------------<<<
+    """Returns commit count for a specified date, from the GitHub API.
+    """
+    requests_session = requests.session()
+    requests_session.auth = (setting('ghiverify', 'github', 'username'),
+                             setting('ghiverify', 'github', 'pat'))
+    v3api = {"Accept": "application/vnd.github.v3+json"}
+
+    commits = 0 # total commits found for this date
+    endpoint = 'https://api.github.com/repos/' + org + '/' + repo + '/commits?per_page=100&page=1'
+    thispage = requests_session.get(endpoint, headers=v3api)
+    totpages = int(github_pagination(thispage)['lastpage'])
+    pages_checked = [] # list of pages visited so far
+    # these are confusing because commits are returned in reverse date order ...
+    page_before = 0 # the highest page# known to fall before thedate
+    page_after = totpages + 1 # the lowest page# known to fall after thedate
+    while True:
+        if not thispage.ok:
+            print('ERROR - {0} - endpoint: {1}'.format(str(thispage, endpoint)))
+            break
+
+        pageno = endpoint_to_pageno(endpoint)
+        #print('page scanned (out of {0} total): {1}'.format(totpages, pages_checked))
+        #print('bounded by page {0} to {1}, current page = {2}, totpages = {3}'. \
+        #    format(page_before, page_after, pageno, totpages))
+        pageno = endpoint_to_pageno(endpoint)
+        if pageno in pages_checked:
+            break # we've been here already, so we're done
+        pages_checked.append(pageno)
+
+        #print('pages visited: ' + str(pages_checked)) #///
+
+        pagelinks = github_pagination(thispage)
+        jsondata = json.loads(thispage.text)
+
+        # determine the date range within this page
+        highest_date = jsondata[0]['commit']['committer']['date'][:10]
+        lowest_date = jsondata[-1]['commit']['committer']['date'][:10]
+
+        if highest_date < thedate:
+            # this page is entirely after (in page order) the desired date
+            if pageno == 1:
+                # nothing to do, we're looking for a date more recent than page 1
+                break
+            page_after = min(pageno, page_after)
+            newpage = int((pageno + page_before)/2)
+            endpoint = endpoint_for_pageno(endpoint, newpage)
+            thispage = requests_session.get(endpoint, headers=v3api)
+            continue
+        if lowest_date > thedate:
+            # this page is entirely before (in page order) the desired date
+            if pageno == totpages:
+                # nothing to do, we're looking for a date older than the last page
+                break
+            page_before = max(pageno, page_before)
+            newpage = int((pageno + page_after)/2)
+            endpoint = endpoint_for_pageno(endpoint, newpage)
+            thispage = requests_session.get(endpoint, headers=v3api)
+            continue
+
+        # count commits on this page matching thedate
+        hits = [True for commit in jsondata
+                if commit['commit']['committer']['date'][:10] == thedate]
+        commits += len(hits)
+
+        if highest_date > thedate and lowest_date < thedate:
+            break # all thedate commits were on this page, we're done
+
+        if highest_date == thedate:
+            if pageno <= 1:
+                break
+            endpoint = endpoint_for_pageno(endpoint, pageno - 1)
+            thispage = requests_session.get(endpoint, headers=v3api)
+            continue
+        if lowest_date == thedate:
+            if pageno >= totpages:
+                break
+            endpoint = endpoint_for_pageno(endpoint, pageno + 1)
+            thispage = requests_session.get(endpoint, headers=v3api)
+
+    return commits
+
+def commit_count_sincedate(org, repo, sincedate=None): #---------------------<<<
+    """Return total number of commits for specified org/repo.
+
+    sincedate = optional; if passed, we only count commits for which the
+                commit.committer.date is on or after sincedate
+                format = string ('2017-04-01')
+
+    If the optional sincedate argument is passed, returns the total number of
+    commits on or after that date.
+    """
+    if not sincedate:
+        sincedate = '1900-01-01'
+
     endpoint = 'https://api.github.com/repos/' + org + '/' + repo + '/commits'
     requests_session = requests.session()
+    requests_session.auth = (setting('ghiverify', 'github', 'username'),
+                             setting('ghiverify', 'github', 'pat'))
 
     # get first page of results
     firstpage = requests_session.get(endpoint,\
@@ -600,6 +805,9 @@ def github_commit_count(org, repo): #----------------------------------------<<<
         return str(firstpage) # 404 errors, etc.
     pagelinks = github_pagination(firstpage)
     json_first = json.loads(firstpage.text)
+    most_recent = json_first[0]['commit']['committer']['date'][:10]
+    if most_recent < sincedate:
+        return 0 # there are no commits after sincedate
     pagesize = len(json_first) # of items on the first page of results
     totpages = int(pagelinks['lastpage'])
     lastpage_url = pagelinks['lastURL']
@@ -612,8 +820,23 @@ def github_commit_count(org, repo): #----------------------------------------<<<
         headers={"Accept": "application/vnd.github.v3+json"})
     json_last = json.loads(lastpage.text)
     lastpage_count = len(json_last) # number of items on the last page
+    first_commit = json_last[-1]['commit']['committer']['date'][:10]
+    if sincedate <= first_commit:
+        # first commit is since sincedate, so return total # commits
+        return (pagesize * (totpages - 1)) + lastpage_count
 
-    return (pagesize * (totpages - 1)) + lastpage_count
+    # edge cases are handled, so need to do binary search to find the count ...
+
+    #/// commits_startin(jsondata, sincedate) - returns whether a sincedate STARTS
+    # in a page (i.e., the page also includes an earlier date, OR the next page
+    # includes ONLY previous dates)
+
+    #/// commits_startpage(org, repo, sincedate) - returns which page # includes
+    # sincedate (by splitting the pages recursively and calling commits_startin)
+
+    #/// once we know which page to count FROM, do the math to count since that date
+
+    return 123456 #///placeholder
 
 def github_data(*, endpoint=None, fields=None): #----------------------------<<<
     """Get data for specified GitHub API endpoint.
@@ -804,25 +1027,95 @@ def repo_include(reponame, created_at): #------------------------------------<<<
 
     return not created_at == str(datetime.datetime.now())[:10]
 
+def verify_commit_order(org, repo): #----------------------------------------<<<
+    """Verify that the GitHub API returns commits in chronological order.
+    """
+    endpoint = 'https://api.github.com/repos/' + org + '/' + repo + '/commits'
+    requests_session = requests.session()
+
+    # get first page of results
+    firstpage = requests_session.get(endpoint,\
+        headers={"Accept": "application/vnd.github.v3+json"})
+    if not firstpage.ok:
+        return str(firstpage) # 404 errors, etc.
+    pagelinks = github_pagination(firstpage)
+    json_first = json.loads(firstpage.text)
+    pagesize = len(json_first) # of items on the first page of results
+    totpages = int(pagelinks['lastpage'])
+    lastpage_url = pagelinks['lastURL']
+    for commit in json_first:
+        commit_date = commit['commit']['committer']['date']
+        commit_msg = commit['commit']['message']
+        print(commit_date, commit_msg)
+
+    #if not lastpage_url:
+    #    return pagesize # only one page of results, so we're done
+
+    # get last page of results
+    #lastpage = requests_session.get(lastpage_url,\
+    #    headers={"Accept": "application/vnd.github.v3+json"})
+    #json_last = json.loads(lastpage.text)
+    #lastpage_count = len(json_last) # number of items on the last page
+
 #----------------------------------------------------------------------------<<<
 # TESTS                                                                      <<<
 #----------------------------------------------------------------------------<<<
 
-def test_commit_count(): #---------------------------------------------------<<<
-    """Test cases for github_commit_count()
+def test_commit_count_date(): #----------------------------------------------<<<
+    """Test cases for commit_count_date()
     """
-    testcases = ['microsoft/dotnet',
-                 'microsoft/vscode',
-                 'microsoft/typescript',
+    testdata = [('microsoft/ghcrawler-datalake-etl', '2017-03-10'),
+                ('microsoft/typescript', '2016-01-05'),
+                ('microsoft/typescript', '2017-01-03'),
+                ('microsoft/typescript', '2017-04-01'),
+                ('dotnet/corefx', '2016-01-05'),
+                ('dotnet/corefx', '2017-01-03'),
+                ('dotnet/corefx', '2017-04-01')]
+    for testrepo, testdate in testdata:
+        org, repo = testrepo.split('/')
+        github = commit_count_date(org, repo, testdate, 'g')
+        datalake = commit_count_date(org, repo, testdate, 'c')
+        print('{0:10}/{1:22} - {2} - Data Lake:{3:5} - GitHub:{4:5}'.format( \
+            org, repo, testdate, datalake, github))
+
+def test_commit_count_sincedate(): #-----------------------------------------<<<
+    """Test cases for commit_count_sincedate()
+    """
+    testrepos = ['microsoft/typescript', 'microsoft/dotnet',
                  'microsoft/ghcrawler-datalake-etl']
-    for orgrepo in testcases:
-        orgname = orgrepo.split('/')[0]
-        reponame = orgrepo.split('/')[1]
-        commits = github_commit_count(orgname, reponame)
-        print(orgrepo + ', total commits = {0}'.format(commits))
+    for orgrepo in testrepos:
+        print(orgrepo)
+        org, repo = orgrepo.split('/')
+        print('- total commits: {0}'. \
+            format(commit_count_sincedate(org, repo)))
+        print('- since 1/1/2017: {0}'. \
+            format(commit_count_sincedate(org, repo, '2017-01-01')))
+        print('- since 3/20/2017: {0}'. \
+            format(commit_count_sincedate(org, repo, '2017-03-20')))
+
+def test_commits_asofdate(): #-----------------------------------------<<<
+    """Test cases for commits_asofdate()
+    """
+    testcases = [('microsoft/typescript', '2017-04-03'),
+                 ('microsoft/vscode', '2017-04-03'),
+                 ('microsoft/ghcrawler-datalake-etl', '2017-04-03'),
+                 ('Azure/azure-github-organization', '2017-04-03')]
+    for orgrepo, asof in testcases:
+        org, repo = orgrepo.split('/')
+        commits = commits_asofdate(org, repo, asof)
+        print(orgrepo.ljust(32) + ' - ' + asof + ' - {0} commits'.format(commits))
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
+    sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
     #daily_diff()
-    #test_commit_count()
-    print(str(repo_admins('microsoft', 'ghcrawler-datalake-etl')))
+    #test_commit_count_date()
+    #test_commit_count_sincedate()
+    test_commits_asofdate()
+    #linkingdata_update()
+    #verify_commit_order('dmahugh', 'gitdata')
+
+    #asof = '2017-04-03'
+    #infile = 'verification_activities_repo.csv'
+    #outfile = 'repototals-' + asof + '.csv'
+    #repototals_asofdate(infile, outfile, asof)
