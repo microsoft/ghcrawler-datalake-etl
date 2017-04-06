@@ -1,14 +1,12 @@
-"""
+"""ghiverify.py - tools to verify data integrity for GHInsights data
+
 Copyright (c) Microsoft Corporation. All rights reserved.
 Licensed under the MIT License.
-
-ghiverify.py - tools to verify data integrity for GHInsights data
 """
 import collections
 import csv
 import datetime
 import glob
-import gzip
 import json
 import re
 import sys
@@ -16,11 +14,11 @@ from timeit import default_timer
 
 import requests
 
-from azure.mgmt.datalake.store import DataLakeStoreAccountManagementClient
-from azure.datalake.store import core, lib, multithread
-
-from dougerino import azure_datalake_token, days_since, dicts2csv, filesize
+from dougerino import days_since, dicts2csv, filesize, gzunzip
 from dougerino import github_allpages, github_pagination, setting
+
+from azurehelpers import azure_datalake_token, azure_blob_get, azure_blob_dir
+from azurehelpers import datalake_put_file, datalake_get_file
 
 #----------------------------------------------------------------------------<<<
 # MISCELLANEOUS                                                              <<<
@@ -72,7 +70,8 @@ def daily_diff(): #----------------------------------------------------------<<<
 
         # download the current CSV file from Azure Data Lake Store
         download_start = default_timer()
-        datalake_download_entity(entity)
+        token, _ = azure_datalake_token('ghiverify')
+        datalake_download_entity(entity, token)
         print_log('Download ' + entity + '.csv from Data Lake '.ljust(27, '.') +
                   '{0:6.1f} seconds, {1:,} bytes'.format( \
             default_timer() - download_start, \
@@ -127,6 +126,67 @@ def datafile_local(entity=None, filetype=None): #----------------------------<<<
     return 'data/' + entity.lower() + '-' + filetype.lower() + '-' +\
         datestr + '.csv'
 
+def datalake_download_entity(entity, token): #-------------------------------<<<
+    """Download specified entity's CSV file from ghinsights Data Lake store.
+
+    entity = entity type (for example, 'repo')
+    token = Oauth token for Azure Data Lake storage account
+
+    Downloads a CSV file from the ghinsightsms Azure Data Lake Store.
+    """
+    localfile = datafile_local(entity=entity, filetype='datalake')
+    remotefile = datalake_filename(entity=entity)
+    adls_account = setting('ghiverify', 'azure', 'adls-account')
+    datalake_get_file(localfile, remotefile, adls_account, token)
+
+def datalake_filename(entity=None): #----------------------------------------<<<
+    """Return path/filename for the Azure Data Lake CSV file for
+    specified entity type.
+
+    Note that we assume title-case. This is correct for Repo.csv and others,
+    but there are some exceptions to be addressed (or eliminated) in the current
+    data on Data Lake.
+    """
+    return '/TabularSource2/' + entity + '.csv'
+
+def datalake_list_accounts(): #----------------------------------------------<<<
+    """List the available Azure Data Lake storage accounts.
+    """
+    _, credentials = azure_datalake_token('ghiverify')
+
+    subscription_id = setting('ghiverify', 'azure', 'subscription')
+    adls_acct_client = \
+        DataLakeStoreAccountManagementClient(credentials, subscription_id)
+
+    result_list_response = adls_acct_client.account.list()
+    result_list = list(result_list_response)
+    for items in result_list:
+        print('--- Azure Data Lake Storage Account ---')
+        print('Name:     ' + items.name)
+        print('Endpoint: ' + items.endpoint)
+        print('Location: ' + str(items.location))
+        print('Created:  ' + str(items.creation_time.date()))
+        print('ID:       ' + str(items.id))
+
+def datalake_upload_entity(entity=None): #-----------------------------------<<<
+    """Upload a specified entity's diff file to Azure Data Lake storage.
+    """
+    localfile = entity.lower() + '_diff.csv'
+    remotefile = '/users/dmahugh/' + localfile
+    token, _ = azure_datalake_token('ghiverify')
+    adls_account = setting('ghiverify', 'azure', 'adls-account')
+    datalake_put_file(localfile, remotefile, adls_account, token)
+
+def datalake_verification_download(): #--------------------------------------<<<
+    """Download the verification data (daily totals for various entities).
+    """
+    datestr = str(datetime.datetime.now())[:10]
+    remotefile = '/TabularSource2/verification_activities.csv'
+    localfile = 'data/verification-datalake-' + datestr + '.csv'
+    token, _ = azure_datalake_token('ghiverify')
+    adls_account = setting('ghiverify', 'azure', 'adls-account')
+    datalake_get_file(localfile, remotefile, adls_account, token)
+
 def date_range(datestr): #---------------------------------------------------<<<
     """Convert date string (YYYY-MM-DD) to one of the following date-range
     categories.
@@ -170,15 +230,17 @@ def diff_report(entity=None, masterfile=None, comparefile=None): #-----------<<<
 def documentation_repo(reponame): #------------------------------------------<<<
     """Check repo name for whether it appears to be a documentation repo.
     """
+    if '-pr_' in reponame.lower() or '-pr.' in reponame.lower():
+        return True # a hack to exclude a bunch of Microsoft repos
     docrepos = [r'.*-pr\..{2}-.{2}.*', r'.*\..{2}-.{2}.*', r'.*-pr$',
-                r'.*\.handoff.*', r'handback', r'ontent-{4}\/']
+                r'.*\.handoff.*', r'.*\.handback', r'ontent-{4}\/']
     for regex in docrepos:
         if re.match(regex, reponame):
             return True
 
     return False
 
-def endpoint_for_pageno(endpoint, pageno): #--------------------------------<<<
+def endpoint_for_pageno(endpoint, pageno): #---------------------------------<<<
     """Return the endpoint for a specified page # of the paginated result set,
     based on a well-formed endpoint for a (any) page and a desired pageno."""
     root, _ = endpoint.split('&')
@@ -191,6 +253,33 @@ def endpoint_to_pageno(endpoint): #------------------------------------------<<<
     if len(parms) < 2:
         return 1
     return int(parms[-1].split('=')[-1])
+
+def latestlinkdata(): #------------------------------------------------------<<<
+    """Returns the most recent filename for Azure blobs that contain linkdata.
+    """
+    azure_acct = setting('azure', 'linkingdata', 'account')
+    azure_key = setting('azure', 'linkingdata', 'key')
+    azure_container = setting('azure', 'linkingdata', 'container')
+
+    blobs = azure_blob_dir(azure_acct, azure_key, azure_container)
+
+    latest = ''
+    for blob in blobs:
+        latest = blob.name if blob.name > latest else latest
+    return latest if latest else None
+
+def linkingdata_update(): #--------------------------------------------------<<<
+    """Update local copy of GitHub-Microsoft account linking data.
+    """
+    azure_acct = setting('azure', 'linkingdata', 'account')
+    azure_key = setting('azure', 'linkingdata', 'key')
+    azure_container = setting('azure', 'linkingdata', 'container')
+    azure_blobname = latestlinkdata()
+    gzfile = 'data/' + azure_blobname
+    print('retrieving link data: ' + azure_blobname)
+
+    azure_blob_get(azure_acct, azure_key, azure_container, azure_blobname, gzfile)
+    gzunzip(gzfile, 'data/linkdata.csv')
 
 def local_filename(entity, source): #----------------------------------------<<<
     """Return filename of a local data file.
@@ -444,7 +533,19 @@ def repo_execvp_voting(): #--------------------------------------------------<<<
         open(outfile, 'a').write(org_repo.replace('/', ',') +
                                  ',' + execvp + '\n')
 
-def repototals_asofdate(rawdata, totfile, asofdate): #------------------------<<<
+def repototal_commits(orgname, reponame): #----------------------------------<<<
+    """Get a total # commits from a repo totals data file created by
+    repototals_asofdate(). (Fields: org/repo, issues, pullrequests, commits.)"""
+    if not hasattr(_settings, 'repo_tot_commits'):
+        # load dictionary first time this function is called
+        _settings.repo_tot_commits = dict()
+        for line in open('repototals-2017-04-03.csv', 'r').readlines():
+            orgrepo, _, _, commits = line.strip().split(',')
+            _settings.repo_tot_commits[orgrepo.lower()] = int(commits)
+    return _settings.repo_tot_commits.get( \
+        orgname.lower() + '/' + reponame.lower(), 0)
+
+def repototals_asofdate(rawdata, totfile, asofdate): #-----------------------<<<
     """Generate a file with total issues, pullrequests, commits for each repo
     as of specified date."""
     tot_issues = dict()
@@ -477,155 +578,6 @@ def repototals_asofdate(rawdata, totfile, asofdate): #------------------------<<
                 str(tot_prs[orgrepo]), str(tot_commits[orgrepo])]) + '\n')
 
 #----------------------------------------------------------------------------<<<
-# AZURE                                                                      <<<
-#----------------------------------------------------------------------------<<<
-
-def latestlinkdata(): #------------------------------------------------------<<<
-    """Returns the most recent filename for Azure blobs that contain linkdata.
-    """
-    azure_acct = setting('azure', 'linkingdata', 'account')
-    azure_key = setting('azure', 'linkingdata', 'key')
-    azure_container = setting('azure', 'linkingdata', 'container')
-
-    from azure.storage.blob import BlockBlobService
-    block_blob_service = BlockBlobService(account_name=azure_acct, account_key=azure_key)
-    blobs = block_blob_service.list_blobs(azure_container)
-    latest = ''
-    for blob in blobs:
-        latest = blob.name if blob.name > latest else latest
-    return latest if latest else None
-
-def linkingdata_update(): #--------------------------------------------------<<<
-    """Update local copy of GitHub-Microsoft account linking data.
-    """
-    azure_acct = setting('azure', 'linkingdata', 'account')
-    azure_key = setting('azure', 'linkingdata', 'key')
-    azure_container = setting('azure', 'linkingdata', 'container')
-    azure_blobname = latestlinkdata()
-    gzfile = 'data/' + azure_blobname
-    print('retrieving link data: ' + azure_blobname)
-
-    # download the Azure blob
-    from azure.storage.blob import BlockBlobService
-    block_blob_service = BlockBlobService(account_name=azure_acct, account_key=azure_key)
-    block_blob_service.get_blob_to_path(azure_container, azure_blobname, gzfile)
-
-    # decompress the JSON file and write to linkdata.csv
-    outfile = 'data/linkdata.csv'
-    with open(outfile, 'w') as fhandle:
-        fhandle.write('githubuser,email\n')
-        for line in gzip.open(gzfile).readlines():
-            jsondata = json.loads(line.decode('utf-8'))
-            outline = jsondata['ghu'] + ',' + jsondata['aadupn']
-            fhandle.write(outline + '\n')
-
-#----------------------------------------------------------------------------<<<
-# DATA LAKE                                                                  <<<
-#----------------------------------------------------------------------------<<<
-
-def datalake_dir(folder, token=None): #--------------------------------------<<<
-    """Get a directory for an ADL filesystem folder.
-
-    Returns a list of filenames.
-    """
-    if not token:
-        token, _ = azure_datalake_token('ghiverify')
-    adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
-    adls_fs_client = \
-        core.AzureDLFileSystem(token, store_name=adls_account)
-
-    return sorted([filename.split('/')[1] for
-                   filename in adls_fs_client.listdir(folder)],
-                  key=lambda fname: fname.lower())
-
-def datalake_download_entity(entity=None, token=None): #---------------------<<<
-    """Download specified entity type's CSV file from ghinsights Data Lake store.
-
-    entity = entity type (for example, 'repo')
-    token = Oauth token for Azure Data Lake; default = azure_datalake_token('ghiverify')
-
-    Downloads a CSV file from the ghinsightsms Azure Data Lake Store.
-    """
-    localfile = datafile_local(entity=entity, filetype='datalake')
-    remotefile = datalake_filename(entity=entity)
-    datalake_download_file(localfile, remotefile, token)
-
-def datalake_download_file(localfile, remotefile, token=None): #-------------<<<
-    """Download a file from Azure Data Lake Store.
-    """
-    if not token:
-        token, _ = azure_datalake_token('ghiverify')
-
-    adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
-    adls_fs_client = \
-        core.AzureDLFileSystem(token, store_name=adls_account)
-
-    multithread.ADLDownloader(adls_fs_client, lpath=localfile,
-                              rpath=remotefile, nthreads=64, overwrite=True,
-                              buffersize=4194304, blocksize=4194304)
-
-def datalake_filename(entity=None): #----------------------------------------<<<
-    """Return path/filename for the Azure Data Lake CSV file for
-    specified entity type.
-
-    Note that we assume title-case. This is correct for Repo.csv and others,
-    but there are some exceptions to be addressed (or eliminated) in the current
-    data on Data Lake.
-    """
-    return '/TabularSource2/' + entity + '.csv'
-
-def datalake_list_accounts(): #----------------------------------------------<<<
-    """List the available Azure Data Lake storage accounts.
-    """
-    _, credentials = azure_datalake_token('ghiverify')
-
-    subscription_id = setting('ghiverify', 'azure', 'subscription')
-    adls_acct_client = \
-        DataLakeStoreAccountManagementClient(credentials, subscription_id)
-
-    result_list_response = adls_acct_client.account.list()
-    result_list = list(result_list_response)
-    for items in result_list:
-        print('--- Azure Data Lake Storage Account ---')
-        print('Name:     ' + items.name)
-        print('Endpoint: ' + items.endpoint)
-        print('Location: ' + str(items.location))
-        print('Created:  ' + str(items.creation_time.date()))
-        print('ID:       ' + str(items.id))
-
-def datalake_upload_entity(entity=None): #-----------------------------------<<<
-    """Upload a specified entity's diff file to Azure Data Lake storage.
-    """
-    localfile = entity.lower() + '_diff.csv'
-    remotefile = '/users/dmahugh/' + localfile
-    datalake_upload_file(localfile, remotefile)
-
-def datalake_upload_file(localfile, remotefile, token=None): #---------------<<<
-    """Upload a file to an Azure Data Lake Store.
-
-    Note that the remote filename should be relative to the root.
-    For example: '/users/dmahugh/repo_diff.csv'
-    """
-    if not token:
-        token, _ = azure_datalake_token('ghiverify')
-
-    adls_account = setting(topic='ghiverify', section='azure', key='adls-account')
-    adls_fs_client = \
-        core.AzureDLFileSystem(token, store_name=adls_account)
-
-    multithread.ADLUploader(adls_fs_client, lpath=localfile,
-                            rpath=remotefile, nthreads=64, overwrite=True,
-                            buffersize=4194304, blocksize=4194304)
-
-def datalake_verification_download(): #--------------------------------------<<<
-    """Download the verification data (daily totals for various entities).
-    """
-    datestr = str(datetime.datetime.now())[:10]
-    remotefile = '/TabularSource2/verification_activities.csv'
-    localfile = 'data/verification-datalake-' + datestr + '.csv'
-    datalake_download_file(localfile, remotefile, token=None)
-
-#----------------------------------------------------------------------------<<<
 # GITHUB                                                                     <<<
 #----------------------------------------------------------------------------<<<
 
@@ -649,8 +601,13 @@ def commits_asofdate(org, repo, asofdate): #---------------------------------<<<
     totpages = int(pagelinks['lastpage'])
     lastpage_url = pagelinks['lastURL']
     jsondata = json.loads(firstpage.text)
+    if 'git repository is empty' in str(jsondata).lower() or \
+        'not found' in str(jsondata).lower():
+        return 0
+    #print(str(jsondata)) #///
     commits_firstpage = len([commit for commit in jsondata \
         if commit['commit']['committer']['date'][:10] <= asofdate])
+
     if not lastpage_url:
         # just one page of results for this repo
         return commits_firstpage
@@ -1093,25 +1050,45 @@ def test_commit_count_sincedate(): #-----------------------------------------<<<
         print('- since 3/20/2017: {0}'. \
             format(commit_count_sincedate(org, repo, '2017-03-20')))
 
-def test_commits_asofdate(): #-----------------------------------------<<<
+def test_commits_asofdate(): #-----------------------------------------------<<<
     """Test cases for commits_asofdate()
     """
-    testcases = [('microsoft/typescript', '2017-04-03'),
-                 ('microsoft/vscode', '2017-04-03'),
-                 ('microsoft/ghcrawler-datalake-etl', '2017-04-03'),
-                 ('Azure/azure-github-organization', '2017-04-03')]
-    for orgrepo, asof in testcases:
+    #testcases = [('microsoft/typescript', '2017-04-03'),
+    #             ('microsoft/vscode', '2017-04-03'),
+    #             ('microsoft/ghcrawler-datalake-etl', '2017-04-03'),
+    #             ('Azure/azure-github-organization', '2017-04-03')]
+    #for orgrepo, asof in testcases:
+    open('repo_commits_audit_2017-04-03.csv', 'w').write( \
+        'org,repo,datalake,github\n')
+
+    asof = '2017-04-03'
+    for orgrepo in open('repos_in_repocsv.csv', 'r').readlines():
+        orgrepo = orgrepo.lower().strip()
         org, repo = orgrepo.split('/')
-        commits = commits_asofdate(org, repo, asof)
-        print(orgrepo.ljust(32) + ' - ' + asof + ' - {0} commits'.format(commits))
+        if not org == 'microsoft':
+            continue
+        if documentation_repo(repo):
+            continue
+        github_commits = commits_asofdate(org, repo, asof)
+        datalake_commits = repototal_commits(org, repo)
+        if datalake_commits == github_commits:
+            desc = '-------'
+        elif datalake_commits > github_commits:
+            desc = 'extra'
+        else:
+            desc = 'MISSING'
+        print(orgrepo.ljust(50) + ' - ' + asof + \
+            ' - DataLake:{0:>6}, GitHub:{1:>6}'. \
+            format(datalake_commits, github_commits) + ' ' + desc)
+        open('repo_commits_audit_2017-04-03.csv', 'a').write( \
+            ','.join([org, repo, str(datalake_commits), str(github_commits)]) + '\n')
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
     sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
-    #daily_diff()
+    daily_diff()
     #test_commit_count_date()
     #test_commit_count_sincedate()
-    test_commits_asofdate()
     #linkingdata_update()
     #verify_commit_order('dmahugh', 'gitdata')
 
@@ -1119,3 +1096,37 @@ if __name__ == '__main__':
     #infile = 'verification_activities_repo.csv'
     #outfile = 'repototals-' + asof + '.csv'
     #repototals_asofdate(infile, outfile, asof)
+
+    #test_commits_asofdate()
+
+    """
+    myreader = csv.reader(open('repo_commits_audit_2017-04-03.csv', 'r'),
+                          delimiter=',', quotechar='"')
+    next(myreader, None) # skip header
+    for values in myreader:
+        org = values[0]
+        repo = values[1]
+        datalake = int(values[2])
+        github = int(values[3])
+
+        percent = 100 if github == 0 else 100 * datalake/github
+
+        if datalake == github:
+            match = 'match'
+        elif datalake > github:
+            if percent < 101:
+                match = '<1% extra'
+            elif percent < 110:
+                match = '<10% extra'
+            else:
+                match = '>10% extra'
+        else:
+            if percent > 99:
+                match = '<1% missing'
+            elif percent > 90:
+                match = '<10% missing'
+            else:
+                match = '>10% missing'
+
+        print(','.join([*values, str(round(percent, 0)), match]))
+    """
