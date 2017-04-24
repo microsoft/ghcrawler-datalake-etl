@@ -18,9 +18,10 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
         ,GHInsights.USql.Utility.GetInteger(Data, "repos_count") AS ReposCount
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.members.href") AS MembersUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repos.href") AS ReposUrn
-        ,GHInsights.USql.Utility.GetDateTime(Data, "_metadata.fetchedAt") AS FetchedAt
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt AS FetchedAt
         ,ProcessedAt AS ProcessedAt
+        ,DeletedAt AS DeletedAt
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.self.href") AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
@@ -58,7 +59,9 @@ SELECT Urn
         ,ReposUrn
         ,FetchedAt
         ,SchemaVersion
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EtlSourceId
         ,EtlIngestDate
 FROM @TeamDeDupe

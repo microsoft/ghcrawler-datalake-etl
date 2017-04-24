@@ -15,7 +15,9 @@ DROP TABLE IF EXISTS GHCrawler.GitHubData;
 CREATE TABLE Staging.GHCrawler.GitHubData (
     EventName string
     ,IngestDate string
+    ,FetchedAt DateTime?
     ,ProcessedAt DateTime?
+    ,DeletedAt DateTime?
     ,Urn string
     ,Data SqlMap<string, byte[]>
     ,INDEX IX_Stage_GhCrawlerData

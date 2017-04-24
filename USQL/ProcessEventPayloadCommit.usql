@@ -47,13 +47,15 @@ GROUP BY EtlIngestDate, EventUrn, ProcessedAt, EventPayloadCommitId, EtlSourceId
 
 @EventPayloadCommit =
 SELECT   EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EventPayloadCommitId
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS EventPayloadCommitSha
-	,GHInsights.USql.Utility.GetPiiString(Data, "author.email") AS AuthorEmail
-	,GHInsights.USql.Utility.GetPiiString(Data, "author.name") AS AuthorName
-	,GHInsights.USql.Utility.GetBoolean(Data, "distinct") AS Distinct
-	,GHInsights.USql.Utility.GetUSqlString(Data, "message") AS Message
+        ,GHInsights.USql.Utility.GetPiiString(Data, "author.email") AS AuthorEmail
+        ,GHInsights.USql.Utility.GetPiiString(Data, "author.name") AS AuthorName
+        ,GHInsights.USql.Utility.GetBoolean(Data, "distinct") AS Distinct
+        ,GHInsights.USql.Utility.GetUSqlString(Data, "message") AS Message
         ,SchemaVersion
         ,EtlIngestDate
         ,EtlSourceId
@@ -71,13 +73,15 @@ CREATE TABLE dbo.EventPayloadCommit
 )
 AS
 SELECT   EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EventPayloadCommitId
         ,EventPayloadCommitSha
-	,AuthorEmail
-	,AuthorName
-	,Distinct
-	,Message
+        ,AuthorEmail
+        ,AuthorName
+        ,Distinct
+        ,Message
         ,SchemaVersion
         ,EtlIngestDate
         ,EtlSourceId

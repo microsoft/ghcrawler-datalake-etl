@@ -9,32 +9,34 @@ SELECT	Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
-		,GHInsights.USql.Utility.GetInteger(Data, "author.id") AS AuthorId
-		,GHInsights.USql.Utility.GetString(Data, "author.login") AS AuthorLogin
-		,GHInsights.USql.Utility.GetBoolean(Data, "author.site_admin") AS AuthorSiteAdmin
-		,GHInsights.USql.Utility.GetString(Data, "author.type") AS AuthorType
-		,GHInsights.USql.Utility.GetDateTime(Data, "commit.author.date") AS CommitAuthorDate
+        ,GHInsights.USql.Utility.GetInteger(Data, "author.id") AS AuthorId
+        ,GHInsights.USql.Utility.GetString(Data, "author.login") AS AuthorLogin
+        ,GHInsights.USql.Utility.GetBoolean(Data, "author.site_admin") AS AuthorSiteAdmin
+        ,GHInsights.USql.Utility.GetString(Data, "author.type") AS AuthorType
+        ,GHInsights.USql.Utility.GetDateTime(Data, "commit.author.date") AS CommitAuthorDate
         ,GHInsights.USql.Utility.GetPiiString(Data, "commit.author.email") AS CommitAuthorEmail
         ,GHInsights.USql.Utility.GetPiiString(Data, "commit.author.name") AS CommitAuthorName
-		,GHInsights.USql.Utility.GetInteger(Data, "commit.comment_count") AS CommitCommentCount
-		,GHInsights.USql.Utility.GetDateTime(Data, "commit.committer.date") AS CommitCommitterDate
+        ,GHInsights.USql.Utility.GetInteger(Data, "commit.comment_count") AS CommitCommentCount
+        ,GHInsights.USql.Utility.GetDateTime(Data, "commit.committer.date") AS CommitCommitterDate
         ,GHInsights.USql.Utility.GetPiiString(Data, "commit.committer.email") AS CommitCommitterEmail
         ,GHInsights.USql.Utility.GetPiiString(Data, "commit.committer.name") AS CommitCommitterName
-		,GHInsights.USql.Utility.GetUSqlString(Data, "commit.message") AS CommitMessage
-		,GHInsights.USql.Utility.GetString(Data, "commit.tree.sha") AS CommitTreeSha
-		,GHInsights.USql.Utility.GetInteger(Data, "committer.id") AS CommitterId
-		,GHInsights.USql.Utility.GetString(Data, "committer.login") AS CommitterLogin
-		,GHInsights.USql.Utility.GetBoolean(Data, "committer.site_admin") AS CommitterSiteAdmin
-		,GHInsights.USql.Utility.GetString(Data, "committer.type") AS CommitterType
-		,GHInsights.USql.Utility.GetInteger(Data, "stats.additions") AS StatsAdditions
-		,GHInsights.USql.Utility.GetInteger(Data, "stats.deletions") AS StatsDeletions
-		,GHInsights.USql.Utility.GetInteger(Data, "stats.total") AS StatsTotal
+        ,GHInsights.USql.Utility.GetUSqlString(Data, "commit.message") AS CommitMessage
+        ,GHInsights.USql.Utility.GetString(Data, "commit.tree.sha") AS CommitTreeSha
+        ,GHInsights.USql.Utility.GetInteger(Data, "committer.id") AS CommitterId
+        ,GHInsights.USql.Utility.GetString(Data, "committer.login") AS CommitterLogin
+        ,GHInsights.USql.Utility.GetBoolean(Data, "committer.site_admin") AS CommitterSiteAdmin
+        ,GHInsights.USql.Utility.GetString(Data, "committer.type") AS CommitterType
+        ,GHInsights.USql.Utility.GetInteger(Data, "stats.additions") AS StatsAdditions
+        ,GHInsights.USql.Utility.GetInteger(Data, "stats.deletions") AS StatsDeletions
+        ,GHInsights.USql.Utility.GetInteger(Data, "stats.total") AS StatsTotal
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.commit_comments.href") AS CommitCommentsUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.author.href") AS AuthorUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.committer.href") AS CommitterUrn
-		,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
-		,ProcessedAt AS ProcessedAt
-		,GHInsights.USql.Utility.GetString(Data, "_metadata.links.self.href") AS EtlSourceId
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt AS FetchedAt
+        ,ProcessedAt AS ProcessedAt
+        ,DeletedAt AS DeletedAt
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.self.href") AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
 WHERE EventName == "pull_request_commit";
@@ -59,32 +61,34 @@ SELECT  Urn
         ,RepoUrn
         ,CommitSha
         ,Url
-		,AuthorId
-		,AuthorLogin
-		,AuthorSiteAdmin
-		,AuthorType
-		,CommitAuthorDate
+        ,AuthorId
+        ,AuthorLogin
+        ,AuthorSiteAdmin
+        ,AuthorType
+        ,CommitAuthorDate
         ,CommitAuthorEmail
-		,CommitAuthorName
-		,CommitCommentCount
-		,CommitCommitterDate
+        ,CommitAuthorName
+        ,CommitCommentCount
+        ,CommitCommitterDate
         ,CommitCommitterEmail
-		,CommitCommitterName
-		,CommitMessage
-		,CommitTreeSha
-		,CommitterId
-		,CommitterLogin
-		,CommitterSiteAdmin
-		,CommitterType
-		,StatsAdditions
-		,StatsDeletions
-		,StatsTotal
+        ,CommitCommitterName
+        ,CommitMessage
+        ,CommitTreeSha
+        ,CommitterId
+        ,CommitterLogin
+        ,CommitterSiteAdmin
+        ,CommitterType
+        ,StatsAdditions
+        ,StatsDeletions
+        ,StatsTotal
         ,CommitCommentsUrn
         ,AuthorUrn
         ,CommitterUrn
-		,SchemaVersion
-		,ProcessedAt
-		,EtlSourceId
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
         ,EtlIngestDate
 FROM @CommitDeDupe
 WHERE RowNumber == 1;

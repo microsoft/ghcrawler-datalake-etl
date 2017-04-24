@@ -20,7 +20,9 @@ SELECT Urn
 		,GHInsights.USql.Utility.GetString(Data, "user.type") AS UserType
 		,GHInsights.USql.Utility.GetString(Data, "_metadata.links.user.href") AS UserUrn
 		,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+    ,FetchedAt
 		,ProcessedAt
+    ,DeletedAt
 		,Urn AS EtlSourceId
     ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e

@@ -12,7 +12,9 @@ SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") A
         ,Data
         ,Urn AS EtlSourceId
         ,GHInsights.USql.Utility.GetDateTime(Data, "_metadata.fetchedAt") AS FetchedAt
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
         FROM Staging.GHCrawler.GitHubData AS e
 WHERE EventName == "contributors";
@@ -32,8 +34,9 @@ SELECT	 EtlIngestDate
         ,JsonPath
         ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
         ,EtlSourceId
-        ,ProcessedAt
         ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
 FROM @UniqueMostRecent AS u INNER JOIN @Raw AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");

@@ -36,7 +36,9 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
     ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.members.href") AS MembersUrn
     ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.user.href") AS UserUrn
     ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+		,FetchedAt AS FetchedAt
 		,ProcessedAt AS ProcessedAt
+		,DeletedAt AS DeletedAt
 		,GHInsights.USql.Utility.GetString(Data, "_metadata.links.self.href") AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
@@ -62,36 +64,38 @@ SELECT  Urn
         , SiblingsUrn
         ,Login
         ,Url
-		,OrgId
-		,Description
-		,Name
-		,Company
-		,Blog
-    ,Email
-		,PublicRepos
-    ,PublicGists
-    ,Followers
-    ,Following
-    ,HtmlUrl
-    ,CreatedAt
-    ,UpdatedAt
-    ,Type
-    ,TotalPrivateRepos
-    ,OwnedPrivateRepos
-    ,PrivateGists
-    ,DiskUsage
-    ,Collaborators
-    ,BillingEmail
-    ,PlanName
-    ,PlanSpace
-    ,PlanFilledSeats
-    ,PlanSeats
-    ,ReposUrn
-    ,MembersUrn
-    ,UserUrn
-    ,SchemaVersion
-		,ProcessedAt
-		,EtlSourceId
+        ,OrgId
+        ,Description
+        ,Name
+        ,Company
+        ,Blog
+        ,Email
+        ,PublicRepos
+        ,PublicGists
+        ,Followers
+        ,Following
+        ,HtmlUrl
+        ,CreatedAt
+        ,UpdatedAt
+        ,Type
+        ,TotalPrivateRepos
+        ,OwnedPrivateRepos
+        ,PrivateGists
+        ,DiskUsage
+        ,Collaborators
+        ,BillingEmail
+        ,PlanName
+        ,PlanSpace
+        ,PlanFilledSeats
+        ,PlanSeats
+        ,ReposUrn
+        ,MembersUrn
+        ,UserUrn
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+    		,EtlSourceId
         ,EtlIngestDate
 FROM @OrgDeDupe
 WHERE RowNumber == 1;

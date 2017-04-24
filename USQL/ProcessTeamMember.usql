@@ -41,17 +41,17 @@ CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
 
-DROP TABLE IF EXISTS dbo.OrgMembers;
+DROP TABLE IF EXISTS dbo.TeamMembers;
 
-CREATE TABLE dbo.OrgMembers
+CREATE TABLE dbo.TeamMembers
 (
-    INDEX IX_OrgMembers
-    CLUSTERED(OrgUrn, UserUrn)
+    INDEX IX_TeamMembers
+    CLUSTERED(TeamUrn, UserUrn)
     DISTRIBUTE
-    HASH(OrgUrn, UserUrn)
+    HASH(TeamUrn, UserUrn)
     INTO 20
 )
 AS
-SELECT  OriginUrn AS OrgUrn,
+SELECT  OriginUrn AS TeamUrn,
         CollectionUrn AS UserUrn
 FROM @CollectionExplode;
