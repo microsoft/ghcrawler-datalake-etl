@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>d27904d6-726d-4cb0-a42f-aac978d20f65</ProjectGuid>
+    <OutputType>File</OutputType>
+    <AssemblyName>Algebra.xml</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <Name>USQL2</Name>
+    <RootNamespace>USQL2</RootNamespace>
+    <RuntimeVersion>default</RuntimeVersion>
+    <OutputStreamPath>C:\Data\AzureDataLake</OutputStreamPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Script Include="CreateTables.usql" />
+    <Script Include="GetRepoData.usql" />
+    <Script Include="ProcessClones.usql" />
+    <Script Include="ProcessCollaborators.usql" />
+    <Script Include="ProcessCommit.usql" />
+    <Script Include="ProcessCommitComment.usql" />
+    <Script Include="ProcessCommitFile.usql" />
+    <Script Include="ProcessCommitParent.usql" />
+    <Script Include="ProcessContributors.usql" />
+    <Script Include="ProcessDaily.usql" />
+    <Script Include="ProcessEvent.usql" />
+    <Script Include="ProcessEventPayloadCommit.usql" />
+    <Script Include="ProcessEventPayloadIssueLabel.usql" />
+    <Script Include="ProcessEventPayloadPage.usql" />
+    <Script Include="ProcessEventPayloadPullRequest.usql" />
+    <Script Include="ProcessEventPayloadReleaseAsset.usql" />
+    <Script Include="ProcessIssue.usql" />
+    <Script Include="ProcessIssueComment.usql" />
+    <Script Include="ProcessIssueLabel.usql" />
+    <Script Include="ProcessMembers.usql" />
+    <Script Include="ProcessOrg.usql" />
+    <Script Include="ProcessOrgMember.usql" />
+    <Script Include="ProcessPaths.usql" />
+    <Script Include="ProcessPullRequest.usql" />
+    <Script Include="ProcessPullRequestCommit.usql" />
+    <Script Include="ProcessPullRequestCommitMap.usql" />
+    <Script Include="ProcessPullRequestReviewComment.usql" />
+    <Script Include="ProcessReferrers.usql" />
+    <Script Include="ProcessRepo.usql" />
+    <Script Include="ProcessRepoTeams.usql" />
+    <Script Include="ProcessStars.usql" />
+    <Script Include="ProcessSubscribers.usql" />
+    <Script Include="ProcessTeam.usql" />
+    <Script Include="ProcessUser.usql" />
+    <Script Include="ProcessViews.usql" />
+    <Script Include="StageData.usql" />
+  </ItemGroup>
+  <Import Project="$(AppData)\Microsoft\DataLake\MsBuild\1.0\Usql.targets" />
+</Project>
