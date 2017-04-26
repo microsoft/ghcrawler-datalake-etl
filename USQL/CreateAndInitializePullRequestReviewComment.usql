@@ -6,7 +6,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @PullRequestComment =
-SELECT	 Urn
+SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetInteger(Data, "pull_request_review_id") AS PullRequestReviewId
         ,GHInsights.USql.Utility.GetString(Data, "_links.html.href") AS LinksHtmlHref
@@ -28,9 +28,9 @@ SELECT	 Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request.href") AS PullRequestUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.user.href") AS UserUrn
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
-        ,FetchedAt AS FetchedAt
-        ,ProcessedAt AS ProcessedAt
-        ,DeletedAt AS DeletedAt
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.self.href") AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
@@ -47,7 +47,7 @@ CREATE TABLE dbo.PullRequestComment
 (
     INDEX IX_PullRequestComment
     CLUSTERED(PullRequestReviewId)
-    PARTITIONED BY
+    DISTRIBUTE
     HASH(PullRequestReviewId, UpdatedAt)
     INTO 20
 )

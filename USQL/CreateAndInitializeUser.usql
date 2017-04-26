@@ -6,7 +6,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @User =
-SELECT	Urn
+SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetString(Data, "login") AS Login
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS UserId
@@ -29,7 +29,7 @@ SELECT	Urn
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
-	    	,Urn AS EtlSourceId
+        ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "user";
@@ -75,4 +75,3 @@ SELECT  Urn
         ,EtlIngestDate
 FROM @UserDeDupe
 WHERE RowNumber == 1;
-

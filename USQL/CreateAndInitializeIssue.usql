@@ -53,7 +53,7 @@ SELECT Urn
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
-	    	,Urn AS EtlSourceId
+        ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "issue";

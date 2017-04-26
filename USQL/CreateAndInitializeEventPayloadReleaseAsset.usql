@@ -7,7 +7,9 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @RawEventPayloadReleaseAsset =
 SELECT  Urn AS EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,Data
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
         ,Urn AS EtlSourceId
@@ -23,7 +25,9 @@ FROM @RawEventPayloadReleaseAsset;
 @EventPayloadReleaseAssetExplode =
 SELECT	 EtlIngestDate
         ,EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS EventPayloadReleaseAssetId
         ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
         ,Value AS Value
@@ -37,13 +41,15 @@ AND RowNumber == 1;
 @EventPayloadReleaseAssetPrePivot =
 SELECT	 EtlIngestDate
         ,EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EventPayloadReleaseAssetId
         ,MAP_AGG(ColumnName, Value) AS Data
         ,SchemaVersion
         ,EtlSourceId
 FROM @EventPayloadReleaseAssetExplode AS e
-GROUP BY EtlIngestDate, EventUrn, ProcessedAt, EventPayloadReleaseAssetId, EtlSourceId, SchemaVersion;
+GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloadReleaseAssetId, EtlSourceId, SchemaVersion;
 
 @EventPayloadReleaseAsset =
 SELECT   EventUrn

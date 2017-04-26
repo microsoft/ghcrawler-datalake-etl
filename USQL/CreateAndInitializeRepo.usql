@@ -6,7 +6,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @Repo =
-SELECT	Urn
+SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.owner.href") AS OwnerUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetString(Data, "name") AS Name
@@ -108,11 +108,11 @@ SELECT	Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.subscribers.href") AS SubscribersPageUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.issues.href") AS IssuesUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.commits.href") AS CommitsUrn
-				,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
-				,FetchedAt
-				,ProcessedAt
-				,DeletedAt
-				,Urn AS EtlSourceId
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "repo";
@@ -124,8 +124,8 @@ FROM @Repo;
 
 @RepoLogDeDupe =
 SELECT *
-	,ROW_NUMBER() OVER (PARTITION BY EtlSourceId, UpdatedAt ORDER BY ProcessedAt DESC) AS RowNumber
-	FROM @Repo;
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId, UpdatedAt ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @Repo;
 
 DROP TABLE IF EXISTS dbo.Repo;
 
@@ -141,7 +141,7 @@ SELECT  Urn
         ,OwnerUrn
         ,SiblingsUrn
         ,Name
-				,RepoId
+        ,RepoId
         ,OwnerLogin
         ,CreatedAt
         ,DefaultBranch
@@ -263,107 +263,109 @@ SELECT  Urn
         ,OwnerUrn
         ,SiblingsUrn
         ,Name
-				,RepoId
-		,OwnerLogin
-		,CreatedAt
-		,DefaultBranch
-		,Description
-		,Fork
-		,Forks
-		,ForksCount
-		,FullName
-		,HasDownloads
-		,HasIssues
-		,HasPages
-		,HasWiki
-		,Homepage
-		,Language
-		,NetworkCount
-		,OpenIssues
-		,OpenIssuesCount
-		,OrganizationId
-		,OrganizationLogin
-		,OrganizationSiteAdmin
-		,OrganizationType
-		,OwnerId
-		,OwnerSiteAdmin
-		,OwnerType
-		,ParentCreatedAt
-		,ParentDefaultBranch
-		,ParentDescription
-		,ParentFork
-		,ParentForks
-		,ParentForksCount
-		,ParentFullName
-		,ParentHasDownloads
-		,ParentHasIssues
-		,ParentHasPages
-		,ParentHasWiki
-		,ParentHomepage
-		,ParentId
-		,ParentLanguage
-		,ParentName
-		,ParentOpenIssues
-		,ParentOpenIssuesCount
-		,ParentOwnerId
-		,ParentOwnerLogin
-		,ParentOwnerSiteAdmin
-		,ParentOwnerType
-		,ParentPrivate
-		,ParentPushedAt
-		,ParentSize
-		,ParentStargazersCount
-		,ParentUpdatedAt
-		,ParentWatchers
-		,ParentWatchersCount
-		,PermissionsAdmin
-		,PermissionsPull
-		,PermissionsPush
-		,IsPrivate
-		,PushedAt
-		,Size
-		,SourceCreatedAt
-		,SourceDefaultBranch
-		,SourceDescription
-		,SourceFork
-		,SourceForks
-		,SourceForksCount
-		,SourceFullName
-		,SourceHasDownloads
-		,SourceHasIssues
-		,SourceHasPages
-		,SourceHasWiki
-		,SourceHomepage
-		,SourceId
-		,SourceLanguage
-		,SourceName
-		,SourceOpenIssues
-		,SourceOpenIssuesCount
-		,SourceOwnerId
-		,SourceOwnerLogin
-		,SourceOwnerSiteAdmin
-		,SourceOwnerType
-		,SourcePrivate
-		,SourcePushedAt
-		,SourceSize
-		,SourceStargazersCount
-		,SourceUpdatedAt
-		,SourceWatchers
-		,SourceWatchersCount
-		,StargazersCount
-		,SubscribersCount
-		,UpdatedAt
-		,Watchers
-		,WatchersCount
-		,TeamsPageUrn
-		,CollaboratorsPageUrn
-		,ContributorsPageUrn
-		,SubscribersPageUrn
-		,IssuesUrn
-		,CommitsUrn
-		,SchemaVersion
-		,ProcessedAt
-		,EtlSourceId
-    ,EtlIngestDate
+        ,RepoId
+        ,OwnerLogin
+        ,CreatedAt
+        ,DefaultBranch
+        ,Description
+        ,Fork
+        ,Forks
+        ,ForksCount
+        ,FullName
+        ,HasDownloads
+        ,HasIssues
+        ,HasPages
+        ,HasWiki
+        ,Homepage
+        ,Language
+        ,NetworkCount
+        ,OpenIssues
+        ,OpenIssuesCount
+        ,OrganizationId
+        ,OrganizationLogin
+        ,OrganizationSiteAdmin
+        ,OrganizationType
+        ,OwnerId
+        ,OwnerSiteAdmin
+        ,OwnerType
+        ,ParentCreatedAt
+        ,ParentDefaultBranch
+        ,ParentDescription
+        ,ParentFork
+        ,ParentForks
+        ,ParentForksCount
+        ,ParentFullName
+        ,ParentHasDownloads
+        ,ParentHasIssues
+        ,ParentHasPages
+        ,ParentHasWiki
+        ,ParentHomepage
+        ,ParentId
+        ,ParentLanguage
+        ,ParentName
+        ,ParentOpenIssues
+        ,ParentOpenIssuesCount
+        ,ParentOwnerId
+        ,ParentOwnerLogin
+        ,ParentOwnerSiteAdmin
+        ,ParentOwnerType
+        ,ParentPrivate
+        ,ParentPushedAt
+        ,ParentSize
+        ,ParentStargazersCount
+        ,ParentUpdatedAt
+        ,ParentWatchers
+        ,ParentWatchersCount
+        ,PermissionsAdmin
+        ,PermissionsPull
+        ,PermissionsPush
+        ,IsPrivate
+        ,PushedAt
+        ,Size
+        ,SourceCreatedAt
+        ,SourceDefaultBranch
+        ,SourceDescription
+        ,SourceFork
+        ,SourceForks
+        ,SourceForksCount
+        ,SourceFullName
+        ,SourceHasDownloads
+        ,SourceHasIssues
+        ,SourceHasPages
+        ,SourceHasWiki
+        ,SourceHomepage
+        ,SourceId
+        ,SourceLanguage
+        ,SourceName
+        ,SourceOpenIssues
+        ,SourceOpenIssuesCount
+        ,SourceOwnerId
+        ,SourceOwnerLogin
+        ,SourceOwnerSiteAdmin
+        ,SourceOwnerType
+        ,SourcePrivate
+        ,SourcePushedAt
+        ,SourceSize
+        ,SourceStargazersCount
+        ,SourceUpdatedAt
+        ,SourceWatchers
+        ,SourceWatchersCount
+        ,StargazersCount
+        ,SubscribersCount
+        ,UpdatedAt
+        ,Watchers
+        ,WatchersCount
+        ,TeamsPageUrn
+        ,CollaboratorsPageUrn
+        ,ContributorsPageUrn
+        ,SubscribersPageUrn
+        ,IssuesUrn
+        ,CommitsUrn
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+        ,EtlIngestDate
 FROM @RepoLogDeDupe
 WHERE RowNumber == 1;

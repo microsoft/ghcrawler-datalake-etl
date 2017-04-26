@@ -7,9 +7,9 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @PullRequest =
 SELECT	 Urn
-				,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
-		    ,GHInsights.USql.Utility.GetInteger(Data, "number") AS Number
+        ,GHInsights.USql.Utility.GetInteger(Data, "number") AS Number
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS PullRequestId
         ,GHInsights.USql.Utility.GetString(Data, "_links.comments.href") AS LinksCommentsHref
         ,GHInsights.USql.Utility.GetString(Data, "_links.commits.href") AS LinksCommitsHref
@@ -163,7 +163,7 @@ CREATE TABLE dbo.PullRequest
 (
     INDEX IX_PullRequest
     CLUSTERED(RepoUrn)
-    PARTITIONED BY
+    DISTRIBUTE
     HASH(RepoUrn, ProcessedAt)
     INTO 20
 )

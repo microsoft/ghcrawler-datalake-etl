@@ -28,7 +28,7 @@ FROM @Raw;
 @UniqueMostRecent = SELECT DISTINCT UniqueUrn FROM @UniqueNumbered WHERE RowNumber == 1;
 
 @CollectionExplode =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,OriginUrn
         ,JsonPath
         ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn

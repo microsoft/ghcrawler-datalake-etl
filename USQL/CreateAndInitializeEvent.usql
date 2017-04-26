@@ -134,9 +134,9 @@ SELECT	 Urn AS Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request.href") AS PullRequestUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.comment.href") AS CommentUrn
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
-        ,FetchedAt AS FetchedAt
-        ,ProcessedAt AS ProcessedAt
-        ,DeletedAt AS DeletedAt
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
@@ -288,7 +288,7 @@ SELECT   Urn
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
-    		,EtlSourceId
+        ,EtlSourceId
         ,EtlIngestDate
 FROM @EventDeDupe
 WHERE RowNumber == 1;

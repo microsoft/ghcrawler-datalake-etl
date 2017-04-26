@@ -10,7 +10,9 @@ SELECT   Urn AS EventUrn
         ,Data
         ,Urn AS EtlSourceId
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
         FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "PushEvent";
@@ -27,7 +29,9 @@ SELECT	 EtlIngestDate
         ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
         ,Value AS Value
         ,SchemaVersion
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EtlSourceId
 FROM @EventDeDupe AS e
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
@@ -37,13 +41,15 @@ AND RowNumber == 1;
 @EventPayloadCommitPrePivot =
 SELECT	 EtlIngestDate
         ,EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EventPayloadCommitId
         ,MAP_AGG(ColumnName, Value) AS Data
         ,SchemaVersion
         ,EtlSourceId
 FROM @EventPayloadCommitExplode AS e
-GROUP BY EtlIngestDate, EventUrn, ProcessedAt, EventPayloadCommitId, EtlSourceId, SchemaVersion;
+GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloadCommitId, EtlSourceId, SchemaVersion;
 
 @EventPayloadCommit =
 SELECT   EventUrn

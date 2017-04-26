@@ -7,7 +7,9 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @RawEventPayloadPage =
 SELECT  Urn AS EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,Data
         ,Urn AS EtlSourceId
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
@@ -23,7 +25,9 @@ FROM @RawEventPayloadPage;
 @EventPayloadPageExplode =
 SELECT	 EtlIngestDate
         ,EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS EventPayloadPageId
         ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
         ,Value AS Value
@@ -37,13 +41,15 @@ AND RowNumber == 1;
 @EventPayloadPagePrePivot =
 SELECT	 EtlIngestDate
         ,EventUrn
+        ,FetchedAt
         ,ProcessedAt
+        ,DeletedAt
         ,EventPayloadPageId
         ,MAP_AGG(ColumnName, Value) AS Data
         ,SchemaVersion
         ,EtlSourceId
 FROM @EventPayloadPageExplode AS e
-GROUP BY EtlIngestDate, EventUrn, ProcessedAt, EventPayloadPageId, EtlSourceId, SchemaVersion;
+GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloadPageId, EtlSourceId, SchemaVersion;
 
 @EventPayloadPage =
 SELECT   EventUrn
