@@ -26,7 +26,7 @@ ALTER TABLE Staging.GHCrawler.GitHubData ADD PARTITION (@IngestDatePartition);
 
 INSERT Staging.GHCrawler.GitHubData
 PARTITION (@IngestDatePartition)
-SELECT  GHInsights.USql.Utility.GetString(Data,"_metadata.type") AS EventName
+SELECT  GHInsights.USql.Utility.GetString(Data,"_metadata.type") AS EntityName
        ,GHInsights.USql.Utility.GetDateTime(Data,"_metadata.fetchedAt") AS FetchedAt
        ,GHInsights.USql.Utility.GetDateTime(Data,"_metadata.processedAt") AS ProcessedAt
        ,GHInsights.USql.Utility.GetDateTime(Data,"_metadata.deletedAt") AS DeletedAt
