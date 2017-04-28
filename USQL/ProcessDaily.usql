@@ -2335,13 +2335,20 @@ WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 @PullRequestCommitMap = SELECT * FROM dbo.PullRequestCommitMap
 UNION ALL
 SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn
+        CollectionUrn AS UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate
 FROM @CollectionExplodeMap;
 
 TRUNCATE TABLE dbo.PullRequestCommitMap;
 
 INSERT INTO dbo.PullRequestCommitMap
-SELECT DISTINCT RepoUrn, UserUrn
+SELECT DISTINCT RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate
 FROM @PullRequestCommitMap;
 
 /////////////////////////////////////////////////////////////////////////
@@ -2841,7 +2848,7 @@ SELECT DISTINCT RepoUrn,
 FROM @CombinedRepoTeams;
 
 /////////////////////////////////////////////////////////////////////////
-// Stars
+// Repo Stargazers
 /////////////////////////////////////////////////////////////////////////
 
 
@@ -2902,7 +2909,7 @@ FROM @CombinedStars;
 
 
 /////////////////////////////////////////////////////////////////////////
-//Subscribers
+// Repo Subscribers
 /////////////////////////////////////////////////////////////////////////
 
 //get all

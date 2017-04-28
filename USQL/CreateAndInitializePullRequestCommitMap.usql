@@ -53,5 +53,8 @@ CREATE TABLE dbo.PullRequestCommitMap
 )
 AS
 SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn
+        CollectionUrn AS UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate
 FROM @CollectionExplodeMap;

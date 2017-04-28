@@ -15,7 +15,7 @@ SELECT  Urn AS CommitUrn
         ,ProcessedAt
         ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "commit";
 
 @CommitDeDupe =
