@@ -14,7 +14,7 @@ SELECT   Urn AS IssueUrn
         ,DeletedAt
         ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "issue";
 
 @IssueLabelDeDupe =
@@ -23,7 +23,7 @@ SELECT   *
 FROM @RawIssueLabel;
 
 @IssueLabelExplode =
-SELECT EtlIngestDate
+SELECT  EtlIngestDate
         ,IssueUrn
         ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS IssueLabelId
         ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
@@ -39,7 +39,7 @@ WHERE JsonPath.StartsWith("labels[")
 AND RowNumber == 1;
 
 @IssueLabelPrePivot =
-SELECT EtlIngestDate
+SELECT  EtlIngestDate
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
@@ -52,7 +52,7 @@ FROM @IssueLabelExplode AS e
 GROUP BY EtlIngestDate, FetchedAt, ProcessedAt, DeletedAt, IssueUrn, IssueLabelId, EtlSourceId, SchemaVersion;
 
 @IssueLabel =
-SELECT IssueUrn
+SELECT  IssueUrn
         ,IssueLabelId
         ,EtlIngestDate
         ,GHInsights.USql.Utility.GetString(Data, "color") AS Color
@@ -75,7 +75,7 @@ CREATE TABLE dbo.IssueLabel
     INTO 20
 )
 AS
-SELECT IssueUrn
+SELECT  IssueUrn
         ,IssueLabelId
         ,EtlIngestDate
         ,Color

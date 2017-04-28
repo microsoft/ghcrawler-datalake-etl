@@ -68,15 +68,16 @@ SELECT Urn,
 FROM @ClonesPrePivot;
 // UNION ALL
 // SELECT *
-// FROM GHInsights.dbo.GitHubClones;
+// FROM GHInsights.dbo.Clones;
 
-@ClonesDeDupe = SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY EtlIngestDate DESC) AS RowNumber
-                FROM @ClonesPivoted;
+@ClonesDeDupe =
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY EtlIngestDate DESC) AS RowNumber
+FROM @ClonesPivoted;
 
 
-// TRUNCATE TABLE GHInsights.dbo.GitHubClones;
+// TRUNCATE TABLE GHInsights.dbo.Clones;
 
-//INSERT GHInsights.dbo.GitHubClones
+//INSERT GHInsights.dbo.Clones
 //SELECT Urn
 //       ,RepoUrn
 //       ,DataDate

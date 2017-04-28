@@ -14,7 +14,7 @@ SELECT  Urn AS EventUrn
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
         ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "ReleaseEvent";
 
 @EventPayloadReleaseAssetDeDupe =
@@ -23,7 +23,7 @@ SELECT   *
 FROM @RawEventPayloadReleaseAsset;
 
 @EventPayloadReleaseAssetExplode =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,EventUrn
         ,FetchedAt
         ,ProcessedAt
@@ -39,7 +39,7 @@ WHERE JsonPath.StartsWith("payload.release.assets[")
 AND RowNumber == 1;
 
 @EventPayloadReleaseAssetPrePivot =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,EventUrn
         ,FetchedAt
         ,ProcessedAt
@@ -71,7 +71,7 @@ SELECT   EventUrn
         ,SchemaVersion
         ,EtlSourceId
         ,EtlIngestDate
-FROM @EventPayloadReleaseAssetPrePivot AS e;
+FROM @EventPayloadReleaseAssetPrePivot;
 
 DROP TABLE IF EXISTS dbo.EventPayloadReleaseAsset;
 

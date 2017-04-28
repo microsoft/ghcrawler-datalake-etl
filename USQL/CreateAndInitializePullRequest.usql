@@ -6,7 +6,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @PullRequest =
-SELECT	 Urn
+SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetInteger(Data, "number") AS Number

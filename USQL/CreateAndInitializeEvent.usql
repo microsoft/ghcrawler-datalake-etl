@@ -7,7 +7,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @Event =
-SELECT	 Urn AS Urn
+SELECT  Urn AS Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.actor.href") AS ActorUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetInteger(Data, "actor.id") AS ActorId

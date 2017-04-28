@@ -5,8 +5,8 @@ USE GHInsights;
 REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
-@Event =
-SELECT	 Urn AS EventUrn
+@EventPR =
+SELECT  Urn AS EventUrn
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
@@ -133,10 +133,10 @@ SELECT	 Urn AS EventUrn
 FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName LIKE "PullRequest%Event";
 
-@EventDeDupe =
+@EventPRDeDupe =
 SELECT   *
         ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
-FROM @Event;
+FROM @EventPR;
 
 DROP TABLE IF EXISTS dbo.EventPayloadPullRequest;
 
@@ -273,5 +273,5 @@ SELECT   EventUrn
         ,DeletedAt
         ,EtlSourceId
         ,EtlIngestDate
-FROM @EventDeDupe
+FROM @EventPRDeDupe
 WHERE RowNumber == 1;

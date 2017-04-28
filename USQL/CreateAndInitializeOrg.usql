@@ -5,7 +5,7 @@ USE GHInsights;
 REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 @Org =
-SELECT Urn
+SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetString(Data, "login") AS Login
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url

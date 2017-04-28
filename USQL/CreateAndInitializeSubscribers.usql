@@ -6,37 +6,35 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 //get all
-@Raw =
+@RawSubscribers =
 SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") AS OriginUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.unique.href") AS UniqueUrn
         ,Data
         ,Urn AS EtlSourceId
         ,FetchedAt
         ,ProcessedAt
-        ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "subscribers";
 
 //find most recent unique for origin
 
-@UniqueNumbered =
+@UniqueNumberedSubscribers =
 SELECT   UniqueUrn
         ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
-FROM @Raw;
+FROM @RawSubscribers;
 
-@UniqueMostRecent = SELECT DISTINCT UniqueUrn FROM @UniqueNumbered WHERE RowNumber == 1;
+@UniqueMostRecentSubscribers = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedSubscribers WHERE RowNumber == 1;
 
-@CollectionExplode =
-SELECT	 EtlIngestDate
+@CollectionExplodeSubscribers =
+SELECT  EtlIngestDate
         ,OriginUrn
         ,JsonPath
         ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
-        ,DeletedAt
-FROM @UniqueMostRecent AS u INNER JOIN @Raw AS e ON u.UniqueUrn == e.UniqueUrn
+FROM @UniqueMostRecentSubscribers AS u INNER JOIN @RawSubscribers AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
@@ -53,5 +51,8 @@ CREATE TABLE dbo.RepoSubscribers
 )
 AS
 SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn
-FROM @CollectionExplode;
+        CollectionUrn AS UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate
+FROM @CollectionExplodeSubscribers;

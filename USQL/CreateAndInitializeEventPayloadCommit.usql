@@ -5,7 +5,7 @@ USE GHInsights;
 REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
-@RawEvent =
+@RawEventCommit =
 SELECT   Urn AS EventUrn
         ,Data
         ,Urn AS EtlSourceId
@@ -14,16 +14,16 @@ SELECT   Urn AS EventUrn
         ,ProcessedAt
         ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "PushEvent";
 
-@EventDeDupe =
+@EventCommitDeDupe =
 SELECT   *
         ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
-FROM @RawEvent;
+FROM @RawEventCommit;
 
 @EventPayloadCommitExplode =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,EventUrn
         ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS EventPayloadCommitId
         ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
@@ -33,13 +33,13 @@ SELECT	 EtlIngestDate
         ,ProcessedAt
         ,DeletedAt
         ,EtlSourceId
-FROM @EventDeDupe AS e
+FROM @EventCommitDeDupe AS e
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("payload.commits[")
 AND RowNumber == 1;
 
 @EventPayloadCommitPrePivot =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,EventUrn
         ,FetchedAt
         ,ProcessedAt
@@ -65,7 +65,7 @@ SELECT   EventUrn
         ,SchemaVersion
         ,EtlIngestDate
         ,EtlSourceId
-FROM @EventPayloadCommitPrePivot AS e;
+FROM @EventPayloadCommitPrePivot;
 
 DROP TABLE IF EXISTS dbo.EventPayloadCommit;
 

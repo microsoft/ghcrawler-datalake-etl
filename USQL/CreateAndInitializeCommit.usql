@@ -5,7 +5,7 @@ USE GHInsights;
 REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 @Commit =
-SELECT	Urn
+SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
@@ -31,9 +31,9 @@ SELECT	Urn
         ,GHInsights.USql.Utility.GetInteger(Data, "stats.deletions") AS StatsDeletions
         ,GHInsights.USql.Utility.GetInteger(Data, "stats.total") AS StatsTotal
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
-        ,FetchedAt AS FetchedAt
-        ,ProcessedAt AS ProcessedAt
-        ,DeletedAt AS DeletedAt
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.self.href") AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e

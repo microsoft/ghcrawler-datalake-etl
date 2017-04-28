@@ -24,7 +24,7 @@ SELECT   *
 FROM @RawCommit;
 
 @CommitParentExplode =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,CommitUrn
         ,CommitSha
         ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS CommitParentId
@@ -41,7 +41,7 @@ WHERE JsonPath.StartsWith("parents[")
 AND RowNumber == 1;
 
 @CommitParentPrePivot =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt

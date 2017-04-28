@@ -70,16 +70,16 @@ SELECT  Urn,
 FROM @ReferrersPrePivot;
 // UNION ALL
 // SELECT *
-// FROM GHInsights.dbo.GitHubReferrers;
+// FROM GHInsights.dbo.Referrers;
 
 @ReferrersDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Referrer, EtlIngestDate ) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Referrer, EtlIngestDate) AS RowNumber
 FROM @ReferrersPivoted;
 
 
-// TRUNCATE TABLE GHInsights.dbo.GitHubReferrers;
+// TRUNCATE TABLE GHInsights.dbo.Referrers;
 
-//INSERT GHInsights.dbo.GitHubReferrers
+//INSERT GHInsights.dbo.Referrers
 //SELECT  Urn
 //        ,RepoUrn
 //        ,DataDate

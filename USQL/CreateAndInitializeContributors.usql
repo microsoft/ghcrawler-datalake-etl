@@ -6,38 +6,35 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 //get all
-@Raw =
+@RawContributors =
 SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") AS OriginUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.unique.href") AS UniqueUrn
         ,Data
         ,Urn AS EtlSourceId
-        ,GHInsights.USql.Utility.GetDateTime(Data, "_metadata.fetchedAt") AS FetchedAt
         ,FetchedAt
         ,ProcessedAt
-        ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "contributors";
 
 //find most recent unique for origin
 
-@UniqueNumbered =
+@UniqueNumberedContributors =
 SELECT   UniqueUrn
         ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
-FROM @Raw;
+FROM @RawContributors;
 
-@UniqueMostRecent = SELECT DISTINCT UniqueUrn FROM @UniqueNumbered WHERE RowNumber == 1;
+@UniqueMostRecentContributors = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedContributors WHERE RowNumber == 1;
 
-@CollectionExplode =
-SELECT	 EtlIngestDate
+@CollectionExplodeContributors =
+SELECT  EtlIngestDate
         ,OriginUrn
         ,JsonPath
         ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
-        ,DeletedAt
-FROM @UniqueMostRecent AS u INNER JOIN @Raw AS e ON u.UniqueUrn == e.UniqueUrn
+FROM @UniqueMostRecentContributors AS u INNER JOIN @RawContributors AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
@@ -54,5 +51,8 @@ CREATE TABLE dbo.RepoContributors
 )
 AS
 SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn
-FROM @CollectionExplode;
+        CollectionUrn AS UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate
+FROM @CollectionExplodeContributors;

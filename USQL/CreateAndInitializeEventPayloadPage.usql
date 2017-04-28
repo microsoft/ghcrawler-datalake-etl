@@ -14,7 +14,7 @@ SELECT  Urn AS EventUrn
         ,Urn AS EtlSourceId
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "GollumEvent";
 
 @EventPayloadPageDeDupe =
@@ -23,7 +23,7 @@ SELECT   *
 FROM @RawEventPayloadPage;
 
 @EventPayloadPageExplode =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,EventUrn
         ,FetchedAt
         ,ProcessedAt
@@ -39,7 +39,7 @@ WHERE JsonPath.StartsWith("payload.pages[")
 AND RowNumber == 1;
 
 @EventPayloadPagePrePivot =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,EventUrn
         ,FetchedAt
         ,ProcessedAt
@@ -65,7 +65,7 @@ SELECT   EventUrn
         ,GHInsights.USql.Utility.GetString(Data, "title") AS Title
         ,SchemaVersion
         ,EtlSourceId
-FROM @EventPayloadPagePrePivot AS e;
+FROM @EventPayloadPagePrePivot;
 
 DROP TABLE IF EXISTS dbo.EventPayloadPage;
 

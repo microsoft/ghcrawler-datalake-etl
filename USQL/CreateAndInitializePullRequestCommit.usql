@@ -4,7 +4,7 @@
 USE GHInsights;
 REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
-@Commit =
+@PRCommit =
 SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
@@ -41,10 +41,10 @@ SELECT  Urn
 FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "pull_request_commit";
 
-@CommitDeDupe =
+@PRCommitDeDupe =
 SELECT   *
         ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
-FROM @Commit;
+FROM @PRCommit;
 
 DROP TABLE IF EXISTS dbo.PullRequestCommit;
 
@@ -90,5 +90,5 @@ SELECT  Urn
         ,DeletedAt
         ,EtlSourceId
         ,EtlIngestDate
-FROM @CommitDeDupe
+FROM @PRCommitDeDupe
 WHERE RowNumber == 1;

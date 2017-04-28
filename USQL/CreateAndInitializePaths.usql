@@ -69,19 +69,20 @@ SELECT Urn,
 FROM @PathsPrePivot;
 // UNION ALL
 // SELECT *
-// FROM GHInsights.dbo.GitHubPaths;
+// FROM GHInsights.dbo.Paths;
 
 @PathsDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Path, EtlIngestDate ) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Path, EtlIngestDate) AS RowNumber
 FROM @PathsPivoted;
 
 
-// TRUNCATE TABLE GHInsights.dbo.GitHubPaths;
+// TRUNCATE TABLE GHInsights.dbo.Paths;
 
-//INSERT GHInsights.dbo.GitHubPaths
+//INSERT GHInsights.dbo.Paths
 //SELECT Urn
 //       ,RepoUrn
-//       ,DataDate
+//       ,Path
+//       ,Title
 //       ,Count
 //       ,Uniques
 //       ,SchemaVersion

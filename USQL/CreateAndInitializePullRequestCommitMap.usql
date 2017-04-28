@@ -6,7 +6,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 //get all
-@Raw =
+@RawMap =
 SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") AS OriginUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.unique.href") AS UniqueUrn
         ,Data
@@ -15,20 +15,20 @@ SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") A
         ,ProcessedAt
         ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "commits" AND Urn LIKE "%pull_request%";
 
 //find most recent unique for origin
 
-@UniqueNumbered =
+@UniqueNumberedMap =
 SELECT   UniqueUrn
         ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
-FROM @Raw;
+FROM @RawMap;
 
-@UniqueMostRecent = SELECT DISTINCT UniqueUrn FROM @UniqueNumbered WHERE RowNumber == 1;
+@UniqueMostRecent = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedMap WHERE RowNumber == 1;
 
-@CollectionExplode =
-SELECT	 EtlIngestDate
+@CollectionExplodeMap =
+SELECT  EtlIngestDate
         ,OriginUrn
         ,JsonPath
         ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
@@ -36,7 +36,7 @@ SELECT	 EtlIngestDate
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
-FROM @UniqueMostRecent AS u INNER JOIN @Raw AS e ON u.UniqueUrn == e.UniqueUrn
+FROM @UniqueMostRecent AS u INNER JOIN @RawMap AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
@@ -54,4 +54,4 @@ CREATE TABLE dbo.PullRequestCommitMap
 AS
 SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn
-FROM @CollectionExplode;
+FROM @CollectionExplodeMap;

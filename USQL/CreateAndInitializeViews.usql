@@ -15,7 +15,7 @@ SELECT  Urn
         ,ProcessedAt
         ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "views";
 
 @GitHubViews =
@@ -69,16 +69,16 @@ SELECT  Urn,
 FROM @ViewsPrePivot;
 // UNION ALL
 // SELECT *
-// FROM GHInsights.dbo.GitHubViews;
+// FROM GHInsights.dbo.Views;
 
 @ViewsDeDupe =
 SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY EtlIngestDate DESC) AS RowNumber
 FROM @ViewsPivoted;
 
 
-// TRUNCATE TABLE GHInsights.dbo.GitHubViews;
+// TRUNCATE TABLE GHInsights.dbo.Views;
 
-//INSERT GHInsights.dbo.GitHubViews
+//INSERT GHInsights.dbo.Views
 //SELECT  Urn
 //        ,RepoUrn
 //        ,DataDate

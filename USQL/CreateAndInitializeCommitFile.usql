@@ -15,7 +15,7 @@ SELECT  Urn AS CommitUrn
         ,ProcessedAt
         ,DeletedAt
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-        FROM Staging.GHCrawler.GitHubData AS e
+FROM Staging.GHCrawler.GitHubData AS e
 WHERE EntityName == "commit";
 
 @CommitDeDupe =
@@ -24,7 +24,7 @@ SELECT   *
 FROM @RawCommit;
 
 @CommitFileExplode =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,CommitUrn
         ,CommitSha
         ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS CommitFileId
@@ -41,7 +41,7 @@ WHERE JsonPath.StartsWith("files[")
 AND RowNumber == 1;
 
 @CommitFilePrePivot =
-SELECT	 EtlIngestDate
+SELECT  EtlIngestDate
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
@@ -70,7 +70,7 @@ SELECT   CommitSha
         ,DeletedAt
         ,EtlSourceId
         ,EtlIngestDate
-FROM @CommitFilePrePivot AS e;
+FROM @CommitFilePrePivot;
 
 DROP TABLE IF EXISTS dbo.CommitFile;
 
