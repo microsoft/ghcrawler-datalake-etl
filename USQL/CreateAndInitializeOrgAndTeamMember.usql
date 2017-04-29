@@ -46,6 +46,7 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentOrgMembers AS u INNER JOIN @RawMembers AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
@@ -58,6 +59,7 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentTeamMembers AS u INNER JOIN @RawMembers AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
@@ -77,7 +79,8 @@ SELECT  OrgUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeOrgMembers;
 
 DROP TABLE IF EXISTS dbo.TeamMembers;
@@ -95,5 +98,6 @@ SELECT  TeamUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeTeamMembers;

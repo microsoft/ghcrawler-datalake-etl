@@ -36,6 +36,7 @@ SELECT  EtlIngestDate
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecent AS u INNER JOIN @RawMap AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
@@ -56,5 +57,6 @@ SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeMap;

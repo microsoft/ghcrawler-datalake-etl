@@ -34,6 +34,7 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentRepoTeams AS u INNER JOIN @RawRepoTeams AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
@@ -54,5 +55,6 @@ SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS TeamUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeRepoTeams;
