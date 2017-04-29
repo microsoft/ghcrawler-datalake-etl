@@ -45,7 +45,9 @@ CREATE TABLE dbo.User
 (
     INDEX IX_User
     CLUSTERED(Urn)
-    DISTRIBUTE HASH(Urn, UpdatedAt)
+    DISTRIBUTE
+    HASH(Urn, UpdatedAt)
+    INTO 20
 )
 AS
 SELECT  Urn

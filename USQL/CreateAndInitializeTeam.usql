@@ -58,7 +58,6 @@ SELECT  Urn
         ,ReposCount
         ,MembersUrn
         ,ReposUrn
-        ,FetchedAt
         ,SchemaVersion
         ,FetchedAt
         ,ProcessedAt
