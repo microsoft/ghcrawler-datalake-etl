@@ -51,20 +51,28 @@ SELECT	 EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentCollaborators AS u INNER JOIN @RawCollaborators AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
+@UniqueMostRecentCollaboratorsRepos =
+SELECT DISTINCT OriginUrn AS RepoUrn
+FROM @RawCollaborators;
+
 @RepoCollaborators =
 SELECT *
-FROM dbo.RepoCollaborators
+FROM @CollectionExplodeCollaborators
 UNION ALL
 SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM @CollectionExplodeCollaborators;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.RepoCollaborators AS r
+LEFT JOIN @UniqueMostRecentCollaboratorsRepos AS e ON e.RepoUrn == r.RepoUrn
+WHERE r.RepoUrn IS NULL;
 
 TRUNCATE TABLE dbo.RepoCollaborators;
 
@@ -73,7 +81,8 @@ SELECT DISTINCT RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @RepoCollaborators;
 
 /////////////////////////////////////////////////////////////////////////
@@ -440,20 +449,28 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentContributors AS u INNER JOIN @RawContributors AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
+@UniqueMostRecentContributorsRepos =
+SELECT DISTINCT OriginUrn AS RepoUrn
+FROM @RawContributors;
+
 @RepoContributors =
 SELECT *
-FROM dbo.RepoContributors
+FROM @CollectionExplodeContributors
 UNION ALL
 SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM @CollectionExplodeContributors;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.RepoContributors AS r
+LEFT JOIN @UniqueMostRecentContributorsRepos AS e ON e.RepoUrn == r.RepoUrn
+WHERE r.RepoUrn IS NULL;
 
 TRUNCATE TABLE dbo.RepoContributors;
 
@@ -462,7 +479,8 @@ SELECT DISTINCT RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @RepoContributors;
 
 
@@ -1741,6 +1759,7 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentOrgMembers AS u INNER JOIN @RawMembers AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
@@ -1753,19 +1772,34 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentTeamMembers AS u INNER JOIN @RawMembers AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
+@UniqueMostRecentOrgMembers =
+SELECT DISTINCT OrgUrn
+FROM @RawMembers
+WHERE OrgUrn IS NOT NULL;
+
+@UniqueMostRecentTeamMembers =
+SELECT DISTINCT TeamUrn
+FROM @RawMembers
+WHERE TeamUrn IS NOT NULL;
+
 @OrgMembers =
-SELECT * FROM dbo.OrgMembers
+SELECT *
+FROM @CollectionExplodeOrgMembers
 UNION ALL
 SELECT  OrgUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM @CollectionExplodeOrgMembers;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.OrgMembers AS m
+LEFT JOIN @UniqueMostRecentOrgMembers AS e ON e.OrgUrn == m.OrgUrn
+WHERE r.OrgUrn IS NULL;
 
 TRUNCATE TABLE dbo.OrgMembers;
 
@@ -1774,18 +1808,22 @@ SELECT DISTINCT OrgUrn,
         UserUrn
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @OrgMembers;
 
 @TeamMembers =
-SELECT * FROM dbo.TeamMembers
+SELECT * FROM @CollectionExplodeTeamMembers
 UNION ALL
 SELECT  TeamUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM @CollectionExplodeTeamMembers;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.TeamMembers AS m
+LEFT JOIN @UniqueMostRecentTeamMembers AS e ON e.TeamUrn == m.TeamUrn
+WHERE m.TeamUrn IS NULL;
 
 TRUNCATE TABLE dbo.TeamMembers;
 
@@ -1794,7 +1832,8 @@ SELECT DISTINCT TeamUrn,
         UserUrn
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @TeamMembers;
 
 /////////////////////////////////////////////////////////////////////////
@@ -2328,18 +2367,28 @@ SELECT  EtlIngestDate
         ,FetchedAt
         ,ProcessedAt
         ,DeletedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentMap AS u INNER JOIN @RawMap AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
-@PullRequestCommitMap = SELECT * FROM dbo.PullRequestCommitMap
+@UniqueMostRecentMapRepos =
+SELECT DISTINCT OriginUrn AS RepoUrn
+FROM @RawMap;
+
+@PullRequestCommitMap =
+SELECT *
+FROM @CollectionExplodeMap
 UNION ALL
 SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM @CollectionExplodeMap;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.PullRequestCommitMap AS r
+LEFT JOIN @UniqueMostRecentMapRepos AS e ON e.RepoUrn == r.RepoUrn
+WHERE r.RepoUrn IS NULL;
 
 TRUNCATE TABLE dbo.PullRequestCommitMap;
 
@@ -2348,7 +2397,8 @@ SELECT DISTINCT RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @PullRequestCommitMap;
 
 /////////////////////////////////////////////////////////////////////////
@@ -2789,7 +2839,7 @@ FROM @RepoLogDeDupe
 WHERE RowNumber == 1;
 
 /////////////////////////////////////////////////////////////////////////
-// RepoTeams
+// Repo Teams
 /////////////////////////////////////////////////////////////////////////
 
 //get all
@@ -2822,20 +2872,28 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentRepoTeams AS u INNER JOIN @RawRepoTeams AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
 
+@UniqueMostRecentTeamsRepos =
+SELECT DISTINCT OriginUrn AS RepoUrn
+FROM @RawRepoTeams;
+
 @CombinedRepoTeams =
 SELECT *
-FROM dbo.RepoTeams
+FROM @CollectionExplodeRepoTeams
 UNION ALL
 SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS TeamUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM @CollectionExplodeRepoTeams;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.RepoTeams AS r
+LEFT JOIN @UniqueMostRecentTeamsRepos AS e ON e.RepoUrn == r.RepoUrn
+WHERE r.RepoUrn IS NULL;
 
 TRUNCATE TABLE dbo.RepoTeams;
 
@@ -2844,7 +2902,8 @@ SELECT DISTINCT RepoUrn,
         TeamUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CombinedRepoTeams;
 
 /////////////////////////////////////////////////////////////////////////
@@ -2882,9 +2941,14 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentStars AS u INNER JOIN @RawStars AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
+
+@UniqueMostRecentStarsRepos =
+SELECT DISTINCT OriginUrn AS RepoUrn
+FROM @RawStars;
 
 @CombinedStars =
 SELECT *
@@ -2894,8 +2958,11 @@ SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM dbo.RepoStargazers;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.RepoStargazers AS r
+LEFT JOIN @UniqueMostRecentStarsRepos AS e ON e.RepoUrn == r.RepoUrn
+WHERE r.RepoUrn IS NULL;
 
 TRUNCATE TABLE dbo.RepoStargazers;
 
@@ -2904,7 +2971,8 @@ SELECT DISTINCT RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CombinedStars;
 
 
@@ -2942,9 +3010,14 @@ SELECT  EtlIngestDate
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
+        ,u.UniqueUrn
 FROM @UniqueMostRecentSubscribers AS u INNER JOIN @RawSubscribers AS e ON u.UniqueUrn == e.UniqueUrn
 CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
+
+@UniqueMostRecentSubscribersRepos =
+SELECT DISTINCT OriginUrn AS RepoUrn
+FROM @RawSubscribers;
 
 @CombinedSubscribers =
 SELECT *
@@ -2954,8 +3027,11 @@ SELECT  OriginUrn AS RepoUrn,
         CollectionUrn AS UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
-FROM dbo.RepoSubscribers;
+        EtlIngestDate,
+        UniqueUrn
+FROM dbo.RepoSubscribers AS r
+LEFT JOIN @UniqueMostRecentSubscribersRepos AS e ON e.RepoUrn == r.RepoUrn
+WHERE r.RepoUrn IS NULL;
 
 TRUNCATE TABLE dbo.RepoSubscribers;
 
@@ -2964,11 +3040,12 @@ SELECT DISTINCT RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
-        EtlIngestDate
+        EtlIngestDate,
+        UniqueUrn
 FROM @CombinedSubscribers;
 
 /////////////////////////////////////////////////////////////////////////
-//Team
+// Team
 /////////////////////////////////////////////////////////////////////////
 
 @Team =
@@ -3198,7 +3275,7 @@ FROM @ClonesDeDupe
 WHERE RowNumber == 1;
 
 /////////////////////////////////////////////////////////////////////////
-//Referrers
+// Referrers
 /////////////////////////////////////////////////////////////////////////
 @RawReferrer =
 SELECT  Urn
@@ -3323,7 +3400,7 @@ FROM @RawPath CROSS APPLY EXPLODE (Data) AS d(JsonPath string, Value byte[])
 WHERE JsonPath.IndexOf("]") > -1;
 
 @PathsPrePivot =
-SELECT Urn,
+SELECT  Urn,
         RepoUrn,
         SchemaVersion,
         FetchedAt,
@@ -3343,7 +3420,7 @@ GROUP BY Urn,
         EtlIngestDate;
 
 @PathsPivoted =
-SELECT Urn,
+SELECT  Urn,
         RepoUrn,
         GHInsights.USql.Utility.GetString(Data, "path") AS Path,
         GHInsights.USql.Utility.GetString(Data, "title") AS Title,
