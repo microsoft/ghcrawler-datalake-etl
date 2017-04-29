@@ -64,8 +64,8 @@ FROM @RawCollaborators;
 SELECT *
 FROM @CollectionExplodeCollaborators
 UNION ALL
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn,
+SELECT  RepoUrn,
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
@@ -462,8 +462,8 @@ FROM @RawContributors;
 SELECT *
 FROM @CollectionExplodeContributors
 UNION ALL
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn,
+SELECT  RepoUrn,
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
@@ -2380,8 +2380,8 @@ FROM @RawMap;
 SELECT *
 FROM @CollectionExplodeMap
 UNION ALL
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn,
+SELECT  RepoUrn,
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
@@ -2885,8 +2885,8 @@ FROM @RawRepoTeams;
 SELECT *
 FROM @CollectionExplodeRepoTeams
 UNION ALL
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS TeamUrn,
+SELECT  RepoUrn,
+        TeamUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
@@ -2954,8 +2954,8 @@ FROM @RawStars;
 SELECT *
 FROM @CollectionExplodeStars
 UNION ALL
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn,
+SELECT  RepoUrn,
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
@@ -3023,8 +3023,8 @@ FROM @RawSubscribers;
 SELECT *
 FROM @CollectionExplodeSubscribers
 UNION ALL
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn,
+SELECT  RepoUrn,
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
