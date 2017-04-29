@@ -1829,7 +1829,7 @@ TRUNCATE TABLE dbo.TeamMembers;
 
 INSERT INTO dbo.TeamMembers
 SELECT DISTINCT TeamUrn,
-        UserUrn
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
