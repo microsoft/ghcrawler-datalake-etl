@@ -1799,7 +1799,7 @@ SELECT  OrgUrn,
         UniqueUrn
 FROM dbo.OrgMembers AS m
 LEFT JOIN @UniqueMostRecentOrgMembers AS e ON e.OrgUrn == m.OrgUrn
-WHERE r.OrgUrn IS NULL;
+WHERE m.OrgUrn IS NULL;
 
 TRUNCATE TABLE dbo.OrgMembers;
 
