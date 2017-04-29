@@ -29,9 +29,9 @@ FROM @RawMap;
 
 @CollectionExplodeMap =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -53,8 +53,8 @@ CREATE TABLE dbo.PullRequestCommitMap
     INTO 20
 )
 AS
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS UserUrn,
+SELECT  RepoUrn,
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,

@@ -28,9 +28,9 @@ FROM @RawRepoTeams;
 
 @CollectionExplodeRepoTeams =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS TeamUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -51,8 +51,8 @@ CREATE TABLE dbo.RepoTeams
     INTO 20
 )
 AS
-SELECT  OriginUrn AS RepoUrn,
-        CollectionUrn AS TeamUrn,
+SELECT  RepoUrn,
+        TeamUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,

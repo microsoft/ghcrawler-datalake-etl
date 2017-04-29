@@ -53,9 +53,6 @@ GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloa
 
 @EventPayloadReleaseAsset =
 SELECT   EventUrn
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS EventPayloadReleaseAssetId
         ,GHInsights.USql.Utility.GetString(Data, "content_type") AS ContentType
         ,GHInsights.USql.Utility.GetDateTime(Data, "created_at") AS CreatedAt
@@ -69,6 +66,9 @@ SELECT   EventUrn
         ,GHInsights.USql.Utility.GetBoolean(Data, "uploader.site_admin") AS UploaderSiteAdmin
         ,GHInsights.USql.Utility.GetString(Data, "uploader.type") AS UploaderType
         ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,EtlSourceId
         ,EtlIngestDate
 FROM @EventPayloadReleaseAssetPrePivot;

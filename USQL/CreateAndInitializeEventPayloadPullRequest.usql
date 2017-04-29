@@ -7,9 +7,6 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @EventPR =
 SELECT  Urn AS EventUrn
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
         ,GHInsights.USql.Utility.GetInteger(Data, "payload.pull_request.id") AS EventPayloadPullRequestId
         ,GHInsights.USql.Utility.GetInteger(Data, "payload.pull_request.additions") AS Additions
         ,GHInsights.USql.Utility.GetInteger(Data, "payload.pull_request.assignee.id") AS AssigneeId
@@ -128,6 +125,9 @@ SELECT  Urn AS EventUrn
         ,GHInsights.USql.Utility.GetBoolean(Data, "payload.pull_request.user.site_admin") AS UserSiteAdmin
         ,GHInsights.USql.Utility.GetString(Data, "payload.pull_request.user.type") AS UserType
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e

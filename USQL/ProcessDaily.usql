@@ -45,9 +45,9 @@ FROM @RawCollaborators;
 
 @CollectionExplodeCollaborators =
 SELECT	 EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -61,10 +61,15 @@ SELECT DISTINCT OriginUrn AS RepoUrn
 FROM @RawCollaborators;
 
 @RepoCollaborators =
-SELECT *
+SELECT  RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeCollaborators
 UNION ALL
-SELECT  RepoUrn,
+SELECT  r.RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -443,9 +448,9 @@ FROM @RawContributors;
 
 @CollectionExplodeContributors =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -459,10 +464,15 @@ SELECT DISTINCT OriginUrn AS RepoUrn
 FROM @RawContributors;
 
 @RepoContributors =
-SELECT *
+SELECT  RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeContributors
 UNION ALL
-SELECT  RepoUrn,
+SELECT  r.RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -1007,9 +1017,6 @@ GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloa
 
 @EventPayloadPage =
 SELECT   EventUrn
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
         ,EventPayloadPageId
         ,EtlIngestDate
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS EventPayloadPageSha
@@ -1018,6 +1025,9 @@ SELECT   EventUrn
         ,GHInsights.USql.Utility.GetString(Data, "summary") AS Summary
         ,GHInsights.USql.Utility.GetString(Data, "title") AS Title
         ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,EtlSourceId
 FROM @EventPayloadPagePrePivot
 UNION ALL
@@ -1036,9 +1046,10 @@ SELECT  EventUrn
         ,EtlSourceId
 FROM dbo.EventPayloadPage;
 
-@EventPayloadPageDeDupe = SELECT *
-		,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
-		FROM @EventPayloadPage;
+@EventPayloadPageDeDupe =
+SELECT *
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @EventPayloadPage;
 
 TRUNCATE TABLE dbo.EventPayloadPage;
 
@@ -1066,9 +1077,6 @@ WHERE RowNumber == 1;
 
 @EventPR =
 SELECT  Urn AS EventUrn
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
         ,GHInsights.USql.Utility.GetInteger(Data, "payload.pull_request.id") AS EventPayloadPullRequestId
         ,GHInsights.USql.Utility.GetInteger(Data, "payload.pull_request.additions") AS Additions
         ,GHInsights.USql.Utility.GetInteger(Data, "payload.pull_request.assignee.id") AS AssigneeId
@@ -1187,6 +1195,9 @@ SELECT  Urn AS EventUrn
         ,GHInsights.USql.Utility.GetBoolean(Data, "payload.pull_request.user.site_admin") AS UserSiteAdmin
         ,GHInsights.USql.Utility.GetString(Data, "payload.pull_request.user.type") AS UserType
         ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,Urn AS EtlSourceId
         ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
 FROM Staging.GHCrawler.GitHubData AS e
@@ -1385,9 +1396,6 @@ GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloa
 
 @EventPayloadReleaseAsset =
 SELECT   EventUrn
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS EventPayloadReleaseAssetId
         ,GHInsights.USql.Utility.GetString(Data, "content_type") AS ContentType
         ,GHInsights.USql.Utility.GetDateTime(Data, "created_at") AS CreatedAt
@@ -1401,6 +1409,9 @@ SELECT   EventUrn
         ,GHInsights.USql.Utility.GetBoolean(Data, "uploader.site_admin") AS UploaderSiteAdmin
         ,GHInsights.USql.Utility.GetString(Data, "uploader.type") AS UploaderType
         ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
         ,EtlSourceId
         ,EtlIngestDate
 FROM @EventPayloadReleaseAssetPrePivot
@@ -1682,7 +1693,7 @@ SELECT  IssueUrn
         ,DeletedAt
 FROM @IssueLabelPrePivot
 UNION ALL
-SELECT IssueUrn
+SELECT  IssueUrn
         ,IssueLabelId
         ,EtlIngestDate
         ,Color
@@ -1788,10 +1799,15 @@ FROM @RawMembers
 WHERE TeamUrn IS NOT NULL;
 
 @OrgMembers =
-SELECT *
+SELECT  OrgUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeOrgMembers
 UNION ALL
-SELECT  OrgUrn,
+SELECT  m.OrgUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -1813,9 +1829,15 @@ SELECT DISTINCT OrgUrn,
 FROM @OrgMembers;
 
 @TeamMembers =
-SELECT * FROM @CollectionExplodeTeamMembers
-UNION ALL
 SELECT  TeamUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
+FROM @CollectionExplodeTeamMembers
+UNION ALL
+SELECT  m.TeamUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -2360,9 +2382,9 @@ FROM @RawMap;
 
 @CollectionExplodeMap =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -2377,10 +2399,15 @@ SELECT DISTINCT OriginUrn AS RepoUrn
 FROM @RawMap;
 
 @PullRequestCommitMap =
-SELECT *
+SELECT  RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeMap
 UNION ALL
-SELECT  RepoUrn,
+SELECT  r.RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -2866,9 +2893,9 @@ FROM @RawRepoTeams;
 
 @CollectionExplodeRepoTeams =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS TeamUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -2882,10 +2909,15 @@ SELECT DISTINCT OriginUrn AS RepoUrn
 FROM @RawRepoTeams;
 
 @CombinedRepoTeams =
-SELECT *
+SELECT  RepoUrn,
+        TeamUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeRepoTeams
 UNION ALL
-SELECT  RepoUrn,
+SELECT  r.RepoUrn,
         TeamUrn,
         FetchedAt,
         ProcessedAt,
@@ -2935,9 +2967,9 @@ FROM @RawStars;
 
 @CollectionExplodeStars =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -2951,10 +2983,15 @@ SELECT DISTINCT OriginUrn AS RepoUrn
 FROM @RawStars;
 
 @CombinedStars =
-SELECT *
+SELECT  RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeStars
 UNION ALL
-SELECT  RepoUrn,
+SELECT  r.RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -3004,9 +3041,9 @@ FROM @RawSubscribers;
 
 @CollectionExplodeSubscribers =
 SELECT  EtlIngestDate
-        ,OriginUrn
+        ,OriginUrn AS RepoUrn
         ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS CollectionUrn
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
         ,EtlSourceId
         ,FetchedAt
         ,ProcessedAt
@@ -3020,10 +3057,15 @@ SELECT DISTINCT OriginUrn AS RepoUrn
 FROM @RawSubscribers;
 
 @CombinedSubscribers =
-SELECT *
+SELECT  RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
 FROM @CollectionExplodeSubscribers
 UNION ALL
-SELECT  RepoUrn,
+SELECT  r.RepoUrn,
         UserUrn,
         FetchedAt,
         ProcessedAt,
@@ -3354,7 +3396,7 @@ TRUNCATE TABLE GHInsights.dbo.Referrers;
 INSERT GHInsights.dbo.Referrers
 SELECT  Urn
        ,RepoUrn
-       ,DataDate
+       ,Referrer
        ,Count
        ,Uniques
        ,SchemaVersion

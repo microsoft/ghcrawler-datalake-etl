@@ -82,7 +82,7 @@ FROM @ReferrersPivoted;
 //INSERT GHInsights.dbo.Referrers
 //SELECT  Urn
 //        ,RepoUrn
-//        ,DataDate
+//        ,Referrer
 //        ,Count
 //        ,Uniques
 //        ,SchemaVersion
