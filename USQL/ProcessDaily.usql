@@ -1805,7 +1805,7 @@ TRUNCATE TABLE dbo.OrgMembers;
 
 INSERT INTO dbo.OrgMembers
 SELECT DISTINCT OrgUrn,
-        UserUrn
+        UserUrn,
         FetchedAt,
         ProcessedAt,
         EtlIngestDate,
