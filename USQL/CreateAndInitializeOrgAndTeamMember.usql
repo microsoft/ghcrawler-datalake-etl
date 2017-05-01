@@ -1,0 +1,103 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+//get all members (either org or team)
+@RawMembers =
+SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.org.href") AS OrgUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.team.href") AS TeamUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.unique.href") AS UniqueUrn
+        ,Data
+        ,Urn AS EtlSourceId
+        ,FetchedAt
+        ,ProcessedAt
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+FROM Staging.GHCrawler.GitHubData AS e
+WHERE EntityName == "members";
+
+//find most recent unique for origin
+
+@UniqueNumberedOrgMembers =
+SELECT   UniqueUrn
+        ,ROW_NUMBER() OVER (PARTITION BY OrgUrn ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawMembers
+WHERE OrgUrn IS NOT NULL;
+
+@UniqueMostRecentOrgMembers =
+SELECT DISTINCT UniqueUrn FROM @UniqueNumberedOrgMembers WHERE RowNumber == 1;
+
+@UniqueNumberedTeamMembers =
+SELECT   UniqueUrn
+        ,ROW_NUMBER() OVER (PARTITION BY TeamUrn ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawMembers
+WHERE TeamUrn IS NOT NULL;
+
+@UniqueMostRecentTeamMembers =
+SELECT DISTINCT UniqueUrn FROM @UniqueNumberedTeamMembers WHERE RowNumber == 1;
+
+@CollectionExplodeOrgMembers =
+SELECT  EtlIngestDate
+        ,OrgUrn
+        ,JsonPath
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
+        ,EtlSourceId
+        ,FetchedAt
+        ,ProcessedAt
+        ,u.UniqueUrn
+FROM @UniqueMostRecentOrgMembers AS u INNER JOIN @RawMembers AS e ON u.UniqueUrn == e.UniqueUrn
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
+
+@CollectionExplodeTeamMembers =
+SELECT  EtlIngestDate
+        ,TeamUrn
+        ,JsonPath
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
+        ,EtlSourceId
+        ,FetchedAt
+        ,ProcessedAt
+        ,u.UniqueUrn
+FROM @UniqueMostRecentTeamMembers AS u INNER JOIN @RawMembers AS e ON u.UniqueUrn == e.UniqueUrn
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
+
+DROP TABLE IF EXISTS dbo.OrgMembers;
+
+CREATE TABLE dbo.OrgMembers
+(
+    INDEX IX_OrgMembers
+    CLUSTERED(OrgUrn, UserUrn)
+    DISTRIBUTE
+    HASH(UserUrn)
+    INTO 20
+)
+AS
+SELECT  OrgUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
+FROM @CollectionExplodeOrgMembers;
+
+DROP TABLE IF EXISTS dbo.TeamMembers;
+
+CREATE TABLE dbo.TeamMembers
+(
+    INDEX IX_TeamMembers
+    CLUSTERED(TeamUrn, UserUrn)
+    DISTRIBUTE
+    HASH(UserUrn)
+    INTO 20
+)
+AS
+SELECT  TeamUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
+FROM @CollectionExplodeTeamMembers;

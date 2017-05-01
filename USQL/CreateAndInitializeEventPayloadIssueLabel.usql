@@ -1,0 +1,90 @@
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+
+@RawEventPayloadIssueLabel =
+SELECT  Urn AS EventUrn
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,GHInsights.USql.Utility.GetInteger(Data, "id") AS EventId
+        ,Data
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,Urn AS EtlSourceId
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+FROM Staging.GHCrawler.GitHubData AS e
+WHERE EntityName == "IssueEvent" || EntityName == "IssueCommentEvent";
+
+@EventPayloadIssueLabelDeDupe =
+SELECT   *
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawEventPayloadIssueLabel;
+
+@EventPayloadIssueLabelExplode =
+SELECT  EtlIngestDate
+        ,EventUrn
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS EventPayloadIssueLabelId
+        ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
+        ,Value AS Value
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadIssueLabelDeDupe AS e
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("payload.issue.labels[")
+AND RowNumber == 1;
+
+@EventPayloadIssueLabelPrePivot =
+SELECT  EtlIngestDate
+        ,EventUrn
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EventPayloadIssueLabelId
+        ,MAP_AGG(ColumnName, Value) AS Data
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadIssueLabelExplode AS e
+GROUP BY EtlIngestDate, EventUrn, FetchedAt, ProcessedAt, DeletedAt, EventPayloadIssueLabelId, EtlSourceId, SchemaVersion;
+
+@EventPayloadIssueLabel =
+SELECT   EventUrn
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EventPayloadIssueLabelId
+        ,EtlIngestDate
+        ,GHInsights.USql.Utility.GetString(Data, "color") AS Color
+        ,GHInsights.USql.Utility.GetString(Data, "name") AS Name
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadIssueLabelPrePivot;
+
+DROP TABLE IF EXISTS dbo.EventPayloadIssueLabel;
+
+CREATE TABLE dbo.EventPayloadIssueLabel
+(
+    INDEX IX_EventPayloadIssueLabel
+    CLUSTERED(EventUrn, Name)
+    DISTRIBUTE
+    HASH(EventUrn, Name)
+    INTO 20
+)
+AS
+SELECT   EventUrn
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EventPayloadIssueLabelId
+        ,EtlIngestDate
+        ,Color
+        ,Name
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @EventPayloadIssueLabel;

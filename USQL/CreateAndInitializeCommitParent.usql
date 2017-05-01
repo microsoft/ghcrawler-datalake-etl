@@ -1,0 +1,92 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+@RawCommit =
+SELECT  Urn AS CommitUrn
+        ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
+        ,Data
+        ,Urn AS EtlSourceId
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+FROM Staging.GHCrawler.GitHubData AS e
+WHERE EntityName == "commit";
+
+@CommitDeDupe =
+SELECT   *
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawCommit;
+
+@CommitParentExplode =
+SELECT  EtlIngestDate
+        ,CommitUrn
+        ,CommitSha
+        ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS CommitParentId
+        ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
+        ,Value AS Value
+        ,SchemaVersion
+        ,EtlSourceId
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+FROM @CommitDeDupe AS e
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("parents[")
+AND RowNumber == 1;
+
+@CommitParentPrePivot =
+SELECT  EtlIngestDate
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,CommitUrn
+        ,CommitSha
+        ,CommitParentId
+        ,MAP_AGG(ColumnName, Value) AS Data
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @CommitParentExplode AS e
+GROUP BY EtlIngestDate, FetchedAt, ProcessedAt, DeletedAt, CommitUrn, CommitSha, CommitParentId, EtlSourceId, SchemaVersion;
+
+@CommitParent =
+SELECT   CommitSha
+        ,CommitUrn
+        ,CommitParentId
+        ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitParentSha
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+        ,EtlIngestDate
+FROM @CommitParentPrePivot AS e;
+
+DROP TABLE IF EXISTS dbo.CommitParent;
+
+CREATE TABLE dbo.CommitParent
+(
+    INDEX IX_CommitParent
+    CLUSTERED(CommitUrn, CommitParentId)
+    DISTRIBUTE
+    HASH(CommitUrn)
+    INTO 20
+)
+AS
+SELECT  CommitUrn
+        ,CommitSha
+        ,CommitParentId
+        ,CommitParentSha
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+        ,EtlIngestDate
+FROM @CommitParent;
+

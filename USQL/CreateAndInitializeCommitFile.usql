@@ -1,0 +1,102 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+@RawCommit =
+SELECT  Urn AS CommitUrn
+        ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
+        ,Data
+        ,Urn AS EtlSourceId
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+FROM Staging.GHCrawler.GitHubData AS e
+WHERE EntityName == "commit";
+
+@CommitDeDupe =
+SELECT   *
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawCommit;
+
+@CommitFileExplode =
+SELECT  EtlIngestDate
+        ,CommitUrn
+        ,CommitSha
+        ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS CommitFileId
+        ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
+        ,Value AS Value
+        ,EtlSourceId
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+FROM @CommitDeDupe AS e
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("files[")
+AND RowNumber == 1;
+
+@CommitFilePrePivot =
+SELECT  EtlIngestDate
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,CommitUrn
+        ,CommitSha
+        ,CommitFileId
+        ,MAP_AGG(ColumnName, Value) AS Data
+        ,EtlSourceId
+        ,SchemaVersion
+FROM @CommitFileExplode AS e
+GROUP BY EtlIngestDate, FetchedAt, ProcessedAt, DeletedAt, CommitUrn, CommitSha, CommitFileId, EtlSourceId, SchemaVersion;
+
+@CommitFile =
+SELECT   CommitSha
+        ,CommitUrn
+        ,CommitFileId
+        ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitFileSha
+        ,GHInsights.USql.Utility.GetString(Data, "filename") AS FileName
+        ,GHInsights.USql.Utility.GetString(Data, "status") AS Status
+        ,GHInsights.USql.Utility.GetInteger(Data, "additions") AS Additions
+        ,GHInsights.USql.Utility.GetInteger(Data, "deletions") AS Deletions
+        ,GHInsights.USql.Utility.GetInteger(Data, "changes") AS Changes
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+        ,EtlIngestDate
+FROM @CommitFilePrePivot;
+
+DROP TABLE IF EXISTS dbo.CommitFile;
+
+CREATE TABLE dbo.CommitFile
+(
+    INDEX IX_CommitFile
+    CLUSTERED(CommitUrn, CommitFileId)
+    DISTRIBUTE
+    HASH(CommitUrn)
+    INTO 20
+)
+AS
+SELECT  CommitUrn
+        ,CommitSha
+        ,CommitFileId
+        ,CommitFileSha
+        ,FileName
+        ,Status
+        ,Additions
+        ,Deletions
+        ,Changes
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+        ,EtlIngestDate
+FROM @CommitFile;
+

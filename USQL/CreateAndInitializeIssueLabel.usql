@@ -1,0 +1,88 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+@RawIssueLabel =
+SELECT   Urn AS IssueUrn
+        ,Data
+        ,GHInsights.USql.Utility.GetInteger(Data, "_metadata.version") AS SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,Urn AS EtlSourceId
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+FROM Staging.GHCrawler.GitHubData AS e
+WHERE EntityName == "issue";
+
+@IssueLabelDeDupe =
+SELECT   *
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawIssueLabel;
+
+@IssueLabelExplode =
+SELECT  EtlIngestDate
+        ,IssueUrn
+        ,Int32.Parse(JsonPath.Substring(JsonPath.IndexOf("[")+1,JsonPath.IndexOf("]") -  JsonPath.IndexOf("[")-1)) AS IssueLabelId
+        ,JsonPath.Substring(JsonPath.IndexOf("]")+2, JsonPath.Length - 2 - JsonPath.IndexOf("]")) AS ColumnName
+        ,Value
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+FROM @IssueLabelDeDupe AS e
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("labels[")
+AND RowNumber == 1;
+
+@IssueLabelPrePivot =
+SELECT  EtlIngestDate
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,IssueUrn
+        ,IssueLabelId
+        ,MAP_AGG(ColumnName, Value) AS Data
+        ,SchemaVersion
+        ,EtlSourceId
+FROM @IssueLabelExplode AS e
+GROUP BY EtlIngestDate, FetchedAt, ProcessedAt, DeletedAt, IssueUrn, IssueLabelId, EtlSourceId, SchemaVersion;
+
+@IssueLabel =
+SELECT  IssueUrn
+        ,IssueLabelId
+        ,EtlIngestDate
+        ,GHInsights.USql.Utility.GetString(Data, "color") AS Color
+        ,GHInsights.USql.Utility.GetString(Data, "name") AS Name
+        ,EtlSourceId
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+FROM @IssueLabelPrePivot AS e;
+
+DROP TABLE IF EXISTS dbo.IssueLabel;
+
+CREATE TABLE dbo.IssueLabel
+(
+    INDEX IX_IssueLabel
+    CLUSTERED(IssueUrn, Name)
+    DISTRIBUTE
+    HASH(IssueUrn, Name)
+    INTO 20
+)
+AS
+SELECT  IssueUrn
+        ,IssueLabelId
+        ,EtlIngestDate
+        ,Color
+        ,Name
+        ,SchemaVersion
+        ,FetchedAt
+        ,ProcessedAt
+        ,DeletedAt
+        ,EtlSourceId
+FROM @IssueLabel;

@@ -1,0 +1,60 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+USE GHInsights;
+REFERENCE ASSEMBLY [GHInsights.USql];
+REFERENCE ASSEMBLY [Newtonsoft.Json];
+
+//get all
+@RawCollaborators =
+SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") AS OriginUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.unique.href") AS UniqueUrn
+        ,Data
+        ,Urn AS EtlSourceId
+        ,FetchedAt
+        ,ProcessedAt
+        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
+        FROM Staging.GHCrawler.GitHubData AS e
+WHERE EntityName == "collaborators";
+
+//find most recent unique for origin
+
+@UniqueNumberedCollaborators =
+SELECT   UniqueUrn
+        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
+FROM @RawCollaborators;
+
+@UniqueMostRecentCollaborators = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedCollaborators WHERE RowNumber == 1;
+
+@CollectionExplodeCollaborators =
+SELECT	 EtlIngestDate
+        ,OriginUrn AS RepoUrn
+        ,JsonPath
+        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
+        ,EtlSourceId
+        ,FetchedAt
+        ,ProcessedAt
+        ,u.UniqueUrn
+FROM @UniqueMostRecentCollaborators AS u INNER JOIN @RawCollaborators AS e ON u.UniqueUrn == e.UniqueUrn
+CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
+WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
+
+
+DROP TABLE IF EXISTS dbo.RepoCollaborators;
+
+CREATE TABLE dbo.RepoCollaborators
+(
+    INDEX IX_RepoCollaborators
+    CLUSTERED(RepoUrn, UserUrn)
+    DISTRIBUTE
+    HASH(RepoUrn)
+    INTO 20
+)
+AS
+SELECT  RepoUrn,
+        UserUrn,
+        FetchedAt,
+        ProcessedAt,
+        EtlIngestDate,
+        UniqueUrn
+FROM @CollectionExplodeCollaborators;
