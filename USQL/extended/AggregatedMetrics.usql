@@ -116,16 +116,25 @@ WHERE   State == "closed" AND
         ClosedAt > @Yesterday
 GROUP BY RepoUrn;
 
+@AllOrgs =
+SELECT  OrgId,
+        Login AS OrgName
+FROM GHInsights.dbo.Org;
+
 @AllRepos =
 SELECT  Urn AS RepoUrn,
-        RepoId, Name AS RepoName,
-        OrganizationId
-FROM GHInsights.dbo.Repo;
+        RepoId,
+        Name AS RepoName,
+        OrgId,
+        OrgName
+FROM GHInsights.dbo.Repo
+INNER JOIN @AllOrgs ON OrganizationId == OrgId;
 
 @RepoMetricsData =
 SELECT  RepoId,
         RepoName,
-        OrganizationId,
+        OrgId,
+        OrgName,
         (Commits IS NULL ? 0 : Commits) AS Commits,
         (LinesCommitted IS NULL ? 0 : LinesCommitted) AS LinesCommitted,
         (CommitsToday IS NULL ? 0 : CommitsToday) AS CommitsToday,
@@ -155,18 +164,14 @@ LEFT JOIN @PullRequestsOpenedTodayByRepos AS prot ON r.RepoUrn == prot.RepoUrn
 LEFT JOIN @PullRequestsClosedTodayByRepos AS prct ON r.RepoUrn == prct.RepoUrn;
 
 OUTPUT @RepoMetricsData
-TO "/Outputs/ghazan/RepoMetricsData.csv"
+TO "wasb://metrics@ospobackup/repos.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true);
 
 // ***** Group by Orgs ***** //
 
-@AllOrgs =
-SELECT OrgId, Login
-FROM GHInsights.dbo.Org;
-
 @OrgsMetricsData =
 SELECT  OrgId,
-        Login,
+        OrgName,
         (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits,
         (SUM(LinesCommitted) IS NULL ? 0 : SUM(LinesCommitted)) AS LinesCommitted,
         (SUM(CommitsToday) IS NULL ? 0 : SUM(CommitsToday)) AS CommitsToday,
@@ -182,12 +187,11 @@ SELECT  OrgId,
         AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
         (SUM(PullRequestsOpenedToday) IS NULL ? 0 : SUM(PullRequestsOpenedToday)) AS PullRequestsOpenedToday,
         (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday
-FROM @AllOrgs
-LEFT JOIN @RepoMetricsData ON OrgId == OrganizationId
-GROUP BY OrgId, Login;
+FROM @RepoMetricsData
+GROUP BY OrgId, OrgName;
 
 OUTPUT @OrgsMetricsData
-TO "/Outputs/ghazan/OrgsMetricsData.csv"
+TO "wasb://metrics@ospobackup/orgs.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true);
 
 // ***** Group by all ***** //
@@ -210,7 +214,7 @@ SELECT  SUM(Commits) AS Commits,
 FROM @OrgsMetricsData;
 
 OUTPUT @AllMetricsData
-TO "/Outputs/ghazan/AllMetricsData.csv"
+TO "wasb://metrics@ospobackup/all.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true);
 
 END;
