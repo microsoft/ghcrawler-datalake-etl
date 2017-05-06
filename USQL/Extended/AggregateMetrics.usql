@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-DROP PROCEDURE IF EXISTS Extended.dbo.AggregatedMetrics;
+DROP PROCEDURE IF EXISTS Extended.dbo.AggregateMetrics;
 
-CREATE PROCEDURE Extended.dbo.AggregatedMetrics()
+CREATE PROCEDURE Extended.dbo.AggregateMetrics()
 AS
 BEGIN
 
