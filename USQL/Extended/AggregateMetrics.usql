@@ -26,6 +26,14 @@ FROM GHInsights.dbo.Commit
 WHERE CommitCommitterDate > @Yesterday
 GROUP BY RepoUrn;
 
+@AllOpenIssuesByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS OpenIssues
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND State == "open"
+GROUP BY RepoUrn;
+
 @AllClosedIssuesByRepos =
 SELECT  RepoUrn,
         COUNT(Urn) AS ClosedIssues,
@@ -126,19 +134,23 @@ SELECT  Urn AS RepoUrn,
         RepoId,
         Name AS RepoName,
         OrgId,
-        OrgName
+        OrgName,
+        WatchersCount AS Watchers
 FROM GHInsights.dbo.Repo
-INNER JOIN @AllOrgs ON OrganizationId == OrgId;
+INNER JOIN @AllOrgs ON OrganizationId == OrgId
+WHERE DeletedAt IS NULL;
 
 @RepoMetricsData =
 SELECT  RepoId,
         RepoName,
         OrgId,
         OrgName,
+        Watchers,
         (Commits IS NULL ? 0 : Commits) AS Commits,
         (LinesCommitted IS NULL ? 0 : LinesCommitted) AS LinesCommitted,
         (CommitsToday IS NULL ? 0 : CommitsToday) AS CommitsToday,
         (LinesCommittedToday IS NULL ? 0 : LinesCommittedToday) AS LinesCommittedToday,
+        (OpenIssues IS NULL ? 0 : OpenIssues) AS OpenIssues,
         (ClosedIssues IS NULL ? 0 : ClosedIssues) AS ClosedIssues,
         (OpenedIssuesToday IS NULL ? 0 : OpenedIssuesToday) AS OpenedIssuesToday,
         (ClosedIssuesToday IS NULL ? 0 : ClosedIssuesToday) AS ClosedIssuesToday,
@@ -153,6 +165,7 @@ SELECT  RepoId,
 FROM @AllRepos AS r
 LEFT JOIN @AllCommitsByRepos AS ac ON r.RepoUrn == ac.RepoUrn
 LEFT JOIN @CommitsTodayByRepos AS ct ON r.RepoUrn == ct.RepoUrn
+LEFT JOIN @AllOpenIssuesByRepos AS aoi ON r.RepoUrn == aoi.RepoUrn
 LEFT JOIN @AllClosedIssuesByRepos AS aci ON r.RepoUrn == aci.RepoUrn
 LEFT JOIN @IssuesOpenedTodayByRepos AS iot ON r.RepoUrn == iot.RepoUrn
 LEFT JOIN @IssuesClosedTodayByRepos AS ict ON r.RepoUrn == ict.RepoUrn
@@ -165,17 +178,19 @@ LEFT JOIN @PullRequestsClosedTodayByRepos AS prct ON r.RepoUrn == prct.RepoUrn;
 
 OUTPUT @RepoMetricsData
 TO "wasb://metrics@ospobackup/repos.csv"
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 // ***** Group by Orgs ***** //
 
 @OrgsMetricsData =
 SELECT  OrgId,
         OrgName,
+        SUM(Watchers) AS Watchers,
         (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits,
         (SUM(LinesCommitted) IS NULL ? 0 : SUM(LinesCommitted)) AS LinesCommitted,
         (SUM(CommitsToday) IS NULL ? 0 : SUM(CommitsToday)) AS CommitsToday,
         (SUM(LinesCommittedToday) IS NULL ? 0 : SUM(LinesCommittedToday)) AS LinesCommittedToday,
+        (SUM(OpenIssues) IS NULL ? 0 : SUM(OpenIssues)) AS OpenIssues,
         (SUM(ClosedIssues) IS NULL ? 0 : SUM(ClosedIssues)) AS ClosedIssues,
         (SUM(OpenedIssuesToday) IS NULL ? 0 : SUM(OpenedIssuesToday)) AS OpenedIssuesToday,
         (SUM(ClosedIssuesToday) IS NULL ? 0 : SUM(ClosedIssuesToday)) AS ClosedIssuesToday,
@@ -192,14 +207,16 @@ GROUP BY OrgId, OrgName;
 
 OUTPUT @OrgsMetricsData
 TO "wasb://metrics@ospobackup/orgs.csv"
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 // ***** Group by all ***** //
 @AllMetricsData =
-SELECT  SUM(Commits) AS Commits,
+SELECT  SUM(Watchers) AS Watchers,
+        SUM(Commits) AS Commits,
         SUM(LinesCommitted) AS LinesCommitted,
         SUM(CommitsToday) AS CommitsToday,
         SUM(LinesCommittedToday) AS LinesCommittedToday,
+        SUM(OpenIssues) AS OpenIssues,
         SUM(ClosedIssues) AS ClosedIssues,
         SUM(OpenedIssuesToday) AS OpenedIssuesToday,
         SUM(ClosedIssuesToday) AS ClosedIssuesToday,
@@ -215,6 +232,6 @@ FROM @OrgsMetricsData;
 
 OUTPUT @AllMetricsData
 TO "wasb://metrics@ospobackup/all.csv"
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 END;
