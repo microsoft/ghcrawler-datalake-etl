@@ -209,7 +209,8 @@ OUTPUT @OrgsMetricsData
 TO "wasb://metrics@ospobackup/orgs.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
-// ***** Group by all ***** //
+// ***** All ***** //
+
 @AllMetricsData =
 SELECT  SUM(Watchers) AS Watchers,
         SUM(Commits) AS Commits,
