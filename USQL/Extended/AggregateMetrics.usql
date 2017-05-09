@@ -1,0 +1,238 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+DROP PROCEDURE IF EXISTS Extended.dbo.AggregateMetrics;
+
+CREATE PROCEDURE Extended.dbo.AggregateMetrics()
+AS
+BEGIN
+
+// ***** Group by Repos ***** //
+
+DECLARE @Yesterday = DateTime.UtcNow.AddDays(-2);
+
+@AllCommitsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS Commits,
+        SUM(StatsTotal) AS LinesCommitted
+FROM GHInsights.dbo.Commit
+GROUP BY RepoUrn;
+
+@CommitsTodayByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS CommitsToday,
+        SUM(StatsTotal) AS LinesCommittedToday
+FROM GHInsights.dbo.Commit
+WHERE CommitCommitterDate > @Yesterday
+GROUP BY RepoUrn;
+
+@AllOpenIssuesByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS OpenIssues
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND State == "open"
+GROUP BY RepoUrn;
+
+@AllClosedIssuesByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS ClosedIssues,
+        AVG(((DateTime)ClosedAt - (DateTime)CreatedAt).TotalDays) AS AvgDaysToCloseIssues
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND State == "closed"
+GROUP BY RepoUrn;
+
+@IssuesOpenedTodayByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS OpenedIssuesToday
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND CreatedAt > @Yesterday
+GROUP BY RepoUrn;
+
+@IssuesClosedTodayByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS ClosedIssuesToday
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND State == "closed"
+        AND ClosedAt > @Yesterday
+GROUP BY RepoUrn;
+
+@IssuesFirstComment =
+SELECT  IssueUrn,
+        MIN(CreatedAt) AS FirstCommentCreatedAt
+FROM GHInsights.dbo.IssueComment
+GROUP BY IssueUrn;
+
+@IssuesResponseDays =
+SELECT  RepoUrn,
+        i.Urn AS IssueUrn,
+        ((DateTime)i.UpdatedAt - (DateTime)i.CreatedAt).TotalDays AS DaysToLastUpdated,
+        (ifc.FirstCommentCreatedAt IS NULL ? 0 : ((DateTime)ifc.FirstCommentCreatedAt - (DateTime)i.CreatedAt).TotalDays) AS DaysToFirstComment
+FROM GHInsights.dbo.Issue AS i
+LEFT JOIN @IssuesFirstComment AS ifc ON i.Urn == ifc.IssueUrn
+WHERE PullRequestUrl IS NULL;
+
+@IssuesFirstResponse =
+SELECT  RepoUrn,
+        IssueUrn,
+        (DaysToLastUpdated != 0 AND DaysToFirstComment != 0) ? Math.Min(DaysToLastUpdated, DaysToFirstComment) : Math.Max(DaysToLastUpdated, DaysToFirstComment) AS DaysToFirstResponse
+FROM @IssuesResponseDays;
+
+@IssuesAvgFirstResponseByRepos =
+SELECT  RepoUrn,
+        AVG(DaysToFirstResponse) AS AvgDaysForFirstResponseToIssues
+FROM @IssuesFirstResponse
+WHERE DaysToFirstResponse != 0
+GROUP BY RepoUrn;
+
+@AllPullRequestsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS PullRequests
+FROM GHInsights.dbo.PullRequest
+GROUP BY RepoUrn;
+
+@AllOpenPullRequestsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS OpenPullRequests
+FROM GHInsights.dbo.PullRequest
+WHERE State == "open"
+GROUP BY RepoUrn;
+
+@AllClosedPullRequestsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS ClosedPullRequests,
+        AVG(((DateTime)ClosedAt - (DateTime)CreatedAt).TotalDays) AS AvgDaysToClosePullRequests
+FROM GHInsights.dbo.PullRequest
+WHERE State == "closed"
+GROUP BY RepoUrn;
+
+@PullRequestsOpenedTodayByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS PullRequestsOpenedToday
+FROM GHInsights.dbo.PullRequest
+WHERE CreatedAt > @Yesterday
+GROUP BY RepoUrn;
+
+@PullRequestsClosedTodayByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS PullRequestsClosedToday
+FROM GHInsights.dbo.PullRequest
+WHERE   State == "closed" AND
+        ClosedAt > @Yesterday
+GROUP BY RepoUrn;
+
+@AllOrgs =
+SELECT  OrgId,
+        Login AS OrgName
+FROM GHInsights.dbo.Org;
+
+@AllRepos =
+SELECT  Urn AS RepoUrn,
+        RepoId,
+        Name AS RepoName,
+        OrgId,
+        OrgName,
+        WatchersCount AS Watchers
+FROM GHInsights.dbo.Repo
+INNER JOIN @AllOrgs ON OrganizationId == OrgId
+WHERE DeletedAt IS NULL;
+
+@RepoMetricsData =
+SELECT  RepoId,
+        RepoName,
+        OrgId,
+        OrgName,
+        Watchers,
+        (Commits IS NULL ? 0 : Commits) AS Commits,
+        (LinesCommitted IS NULL ? 0 : LinesCommitted) AS LinesCommitted,
+        (CommitsToday IS NULL ? 0 : CommitsToday) AS CommitsToday,
+        (LinesCommittedToday IS NULL ? 0 : LinesCommittedToday) AS LinesCommittedToday,
+        (OpenIssues IS NULL ? 0 : OpenIssues) AS OpenIssues,
+        (ClosedIssues IS NULL ? 0 : ClosedIssues) AS ClosedIssues,
+        (OpenedIssuesToday IS NULL ? 0 : OpenedIssuesToday) AS OpenedIssuesToday,
+        (ClosedIssuesToday IS NULL ? 0 : ClosedIssuesToday) AS ClosedIssuesToday,
+        AvgDaysToCloseIssues,
+        AvgDaysForFirstResponseToIssues,
+        (PullRequests IS NULL ? 0 : PullRequests) AS PullRequests,
+        (OpenPullRequests IS NULL ? 0 : OpenPullRequests) AS OpenPullRequests,
+        (ClosedPullRequests IS NULL ? 0 : ClosedPullRequests) AS ClosedPullRequests,
+        AvgDaysToClosePullRequests,
+        (PullRequestsOpenedToday IS NULL ? 0 : PullRequestsOpenedToday) AS PullRequestsOpenedToday,
+        (PullRequestsClosedToday IS NULL ? 0 : PullRequestsClosedToday) AS PullRequestsClosedToday
+FROM @AllRepos AS r
+LEFT JOIN @AllCommitsByRepos AS ac ON r.RepoUrn == ac.RepoUrn
+LEFT JOIN @CommitsTodayByRepos AS ct ON r.RepoUrn == ct.RepoUrn
+LEFT JOIN @AllOpenIssuesByRepos AS aoi ON r.RepoUrn == aoi.RepoUrn
+LEFT JOIN @AllClosedIssuesByRepos AS aci ON r.RepoUrn == aci.RepoUrn
+LEFT JOIN @IssuesOpenedTodayByRepos AS iot ON r.RepoUrn == iot.RepoUrn
+LEFT JOIN @IssuesClosedTodayByRepos AS ict ON r.RepoUrn == ict.RepoUrn
+LEFT JOIN @IssuesAvgFirstResponseByRepos AS iafr ON r.RepoUrn == iafr.RepoUrn
+LEFT JOIN @AllPullRequestsByRepos AS apr ON r.RepoUrn == apr.RepoUrn
+LEFT JOIN @AllOpenPullRequestsByRepos AS aopr ON r.RepoUrn == aopr.RepoUrn
+LEFT JOIN @AllClosedPullRequestsByRepos AS acpr ON r.RepoUrn == acpr.RepoUrn
+LEFT JOIN @PullRequestsOpenedTodayByRepos AS prot ON r.RepoUrn == prot.RepoUrn
+LEFT JOIN @PullRequestsClosedTodayByRepos AS prct ON r.RepoUrn == prct.RepoUrn;
+
+OUTPUT @RepoMetricsData
+TO "wasb://metrics@ospobackup/repos.csv"
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+
+// ***** Group by Orgs ***** //
+
+@OrgsMetricsData =
+SELECT  OrgId,
+        OrgName,
+        SUM(Watchers) AS Watchers,
+        (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits,
+        (SUM(LinesCommitted) IS NULL ? 0 : SUM(LinesCommitted)) AS LinesCommitted,
+        (SUM(CommitsToday) IS NULL ? 0 : SUM(CommitsToday)) AS CommitsToday,
+        (SUM(LinesCommittedToday) IS NULL ? 0 : SUM(LinesCommittedToday)) AS LinesCommittedToday,
+        (SUM(OpenIssues) IS NULL ? 0 : SUM(OpenIssues)) AS OpenIssues,
+        (SUM(ClosedIssues) IS NULL ? 0 : SUM(ClosedIssues)) AS ClosedIssues,
+        (SUM(OpenedIssuesToday) IS NULL ? 0 : SUM(OpenedIssuesToday)) AS OpenedIssuesToday,
+        (SUM(ClosedIssuesToday) IS NULL ? 0 : SUM(ClosedIssuesToday)) AS ClosedIssuesToday,
+        AVG(AvgDaysToCloseIssues) AS AvgDaysToCloseIssues,
+        AVG(AvgDaysForFirstResponseToIssues) AS AvgDaysForFirstResponseToIssues,
+        (SUM(PullRequests) IS NULL ? 0 : SUM(PullRequests)) AS PullRequests,
+        (SUM(OpenPullRequests) IS NULL ? 0 : SUM(OpenPullRequests)) AS OpenPullRequests,
+        (SUM(ClosedPullRequests) IS NULL ? 0 : SUM(ClosedPullRequests)) AS ClosedPullRequests,
+        AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
+        (SUM(PullRequestsOpenedToday) IS NULL ? 0 : SUM(PullRequestsOpenedToday)) AS PullRequestsOpenedToday,
+        (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday
+FROM @RepoMetricsData
+GROUP BY OrgId, OrgName;
+
+OUTPUT @OrgsMetricsData
+TO "wasb://metrics@ospobackup/orgs.csv"
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+
+// ***** All ***** //
+
+@AllMetricsData =
+SELECT  SUM(Watchers) AS Watchers,
+        SUM(Commits) AS Commits,
+        SUM(LinesCommitted) AS LinesCommitted,
+        SUM(CommitsToday) AS CommitsToday,
+        SUM(LinesCommittedToday) AS LinesCommittedToday,
+        SUM(OpenIssues) AS OpenIssues,
+        SUM(ClosedIssues) AS ClosedIssues,
+        SUM(OpenedIssuesToday) AS OpenedIssuesToday,
+        SUM(ClosedIssuesToday) AS ClosedIssuesToday,
+        AVG(AvgDaysToCloseIssues) AS AvgDaysToCloseIssues,
+        AVG(AvgDaysForFirstResponseToIssues) AS AvgDaysForFirstResponseToIssues,
+        SUM(PullRequests) AS PullRequests,
+        SUM(OpenPullRequests) AS OpenPullRequests,
+        SUM(ClosedPullRequests) AS ClosedPullRequests,
+        AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
+        SUM(PullRequestsOpenedToday) AS PullRequestsOpenedToday,
+        SUM(PullRequestsClosedToday) AS PullRequestsClosedToday
+FROM @OrgsMetricsData;
+
+OUTPUT @AllMetricsData
+TO "wasb://metrics@ospobackup/all.csv"
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+
+END;
