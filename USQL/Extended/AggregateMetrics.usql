@@ -135,7 +135,7 @@ SELECT  Urn AS RepoUrn,
         Name AS RepoName,
         OrgId,
         OrgName,
-        WatchersCount AS Watchers
+        SubscribersCount AS Subscribers
 FROM GHInsights.dbo.Repo
 INNER JOIN @AllOrgs ON OrganizationId == OrgId
 WHERE DeletedAt IS NULL;
@@ -145,7 +145,7 @@ SELECT  RepoId,
         RepoName,
         OrgId,
         OrgName,
-        Watchers,
+        Subscribers,
         (Commits IS NULL ? 0 : Commits) AS Commits,
         (LinesCommitted IS NULL ? 0 : LinesCommitted) AS LinesCommitted,
         (CommitsToday IS NULL ? 0 : CommitsToday) AS CommitsToday,
@@ -185,7 +185,7 @@ USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 @OrgsMetricsData =
 SELECT  OrgId,
         OrgName,
-        SUM(Watchers) AS Watchers,
+        SUM(Subscribers) AS Subscribers,
         (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits,
         (SUM(LinesCommitted) IS NULL ? 0 : SUM(LinesCommitted)) AS LinesCommitted,
         (SUM(CommitsToday) IS NULL ? 0 : SUM(CommitsToday)) AS CommitsToday,
@@ -212,7 +212,7 @@ USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 // ***** All ***** //
 
 @AllMetricsData =
-SELECT  SUM(Watchers) AS Watchers,
+SELECT  SUM(Subscribers) AS Subscribers,
         SUM(Commits) AS Commits,
         SUM(LinesCommitted) AS LinesCommitted,
         SUM(CommitsToday) AS CommitsToday,
