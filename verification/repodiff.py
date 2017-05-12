@@ -221,8 +221,8 @@ if __name__ == '__main__':
 
     # download the current CSV file from Azure Data Lake Store
     download_start = default_timer()
-    token, _ = azure_datalake_token('ghiverify')
-    adls_account = setting('ghiverify', 'azure', 'adls-account')
+    token, _ = azure_datalake_token('ghinsights')
+    adls_account = setting('ghinsights', 'azure', 'adls-account')
     datalake_get_file(datalake_csv_local, datalake_csv, adls_account, token)
     print_log(logfile, 'Download Repo.csv from Data Lake '.ljust(40, '.') + \
         '{0:6.1f} seconds, {1:,} bytes'.format( \
@@ -251,8 +251,8 @@ if __name__ == '__main__':
 
     # upload diff report CSV file to Azure Data Lake Store
     upload_start = default_timer()
-    token, _ = azure_datalake_token('ghiverify')
-    adls_account = setting('ghiverify', 'azure', 'adls-account')
+    token, _ = azure_datalake_token('ghinsights')
+    adls_account = setting('ghinsights', 'azure', 'adls-account')
     datalake_put_file(diff_file, diff_file_datalake, adls_account, token)
     print_log(logfile, 'Upload repodiff.csv to Data Lake '.ljust(40, '.') +
               '{0:6.1f} seconds'.format(default_timer() - upload_start))

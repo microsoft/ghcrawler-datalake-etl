@@ -50,13 +50,13 @@ def audit_reports(asofdate, orgfilter): #------------------------------------<<<
 
     if download_datalake:
         print('Downloading daily totals from Data Lake ...')
-        token, _ = azure_datalake_token('ghiverify')
-        adls_account = setting('ghiverify', 'azure', 'adls-account')
+        token, _ = azure_datalake_token('ghinsights')
+        adls_account = setting('ghinsights', 'azure', 'adls-account')
         datalake_get_file(local_dailytots, \
             '/TabularSource2/verification_activities_repo.csv', adls_account, token)
         print('Downloading repo data from Data Lake ...')
-        token, _ = azure_datalake_token('ghiverify')
-        adls_account = setting('ghiverify', 'azure', 'adls-account')
+        token, _ = azure_datalake_token('ghinsights')
+        adls_account = setting('ghinsights', 'azure', 'adls-account')
         datalake_get_file('data/Repo.csv', '/TabularSource2/Repo.csv', \
             adls_account, token)
 
@@ -115,8 +115,8 @@ def commits_asofdate_github(org, repo, asofdate): #--------------------------<<<
     recent asofdate values.
     """
     requests_session = requests.session()
-    requests_session.auth = (setting('ghiverify', 'github', 'username'),
-                             setting('ghiverify', 'github', 'pat'))
+    requests_session.auth = (setting('ghinsights', 'github', 'username'),
+                             setting('ghinsights', 'github', 'pat'))
     v3api = {"Accept": "application/vnd.github.v3+json"}
 
     # handle first page
@@ -246,8 +246,8 @@ def issues_asofdate_github(org, repo, asofdate): #---------------------------<<<
     recent asofdate values.
     """
     requests_session = requests.session()
-    requests_session.auth = (setting('ghiverify', 'github', 'username'),
-                             setting('ghiverify', 'github', 'pat'))
+    requests_session.auth = (setting('ghinsights', 'github', 'username'),
+                             setting('ghinsights', 'github', 'pat'))
     v3api = {"Accept": "application/vnd.github.v3+json"}
 
     # handle first page
