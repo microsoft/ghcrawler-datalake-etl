@@ -91,40 +91,24 @@ in the past, the OSPO team has handled a variety of ad-hoc reports and analyses 
 
 ## authentication
 
-/// rename ghiverify - ghinsightsms.ini
-
-/// put a sample ini file in the misc folder
-
 These programs require authentication for Azure Data Lake access
 (via Azure Active Directory) and the GitHub API (via a username/personal access token).
-Credentials are stored in a local file named _ghiverify.ini_ that is stored in a
-sibling folder (subdir of the parent) named __private_. Here is an example of the
-structure of the INI file:
+Credentials are stored in a local file named _ghiinsights.ini_ that is stored in a
+sibling folder (subdir of the parent) named __private_.
 
-```
-[github]
-username = xxxxxxxx
-pat = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-[azure]
-subscription = xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-adls-account = xxxxxxxxxxx
-
-[aad]
-tenant-id = xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-client-secret = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
-
-client-id = xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-```
+A template for setting up your INI file can be found here: [ghinsights.ini](https://github.com/Microsoft/ghcrawler-datalake-etl/blob/master/verification/misc/ghinsights.ini)
 
 ## installation
 
-/// git clone
+To install the data verification scripts, follow these steps:
 
-/// move _private to a sibling folder, fill in the INI file
+* Install the latest version of Python from [Python.org](https://www.python.org/)
+* Clone the repo: ```git clone https://github.com/Microsoft/ghcrawler-datalake-etl.git```
+* Configure the ghinsights.ini file (found in the _misc_ folder) and then put it in a folder named _..\private_ relative to the root folder of the project
+* Edit the _orgs.txt_ file in the data folder, to add the GitHub organizations you're crawling/verifying
+* Install the Python package dependencies: ```pip install -r requirements.txt``` in the root folder
 
-/// edit orgs.txt, fill it in
+You should then be able to run the programs with these commands:
 
-/// install python and dependencies
-
-
+```python repodiff.py``` = run the repo report
+```python audit.py``` = run the commits and issues reports
