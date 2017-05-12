@@ -1,8 +1,12 @@
-"""ghiverify.py - tools to verify data integrity for GHInsights data
-
+"""miscellaneous.py
 Copyright (c) Microsoft Corporation. All rights reserved.
 Licensed under the MIT License.
 """
+# This source file includes code used for various ad-hoc reports and analyses
+# in the past. The code is included here in case any of it may be useful going
+# forward, but the key data-verification functionality hs been repackaged into
+# other source files.
+
 import collections
 import csv
 import datetime
@@ -14,11 +18,7 @@ from timeit import default_timer
 
 import requests
 
-from dougerino import days_since, dicts2csv, filesize, gzunzip
-from dougerino import github_allpages, github_pagination, setting
-
-from azurehelpers import azure_datalake_token, azure_blob_get, azure_blob_dir
-from azurehelpers import datalake_put_file, datalake_get_file
+from shared import *
 
 #----------------------------------------------------------------------------<<<
 # MISCELLANEOUS                                                              <<<
@@ -47,6 +47,119 @@ def add_execvp(): #----------------------------------------------------------<<<
         outfile.write(','.join(values) + ',' + execvp + '\n')
 
     outfile.close()
+
+def commits_audit(): #-------------------------------------------------------<<<
+    """Audit commit counts for selected repos."""
+    # the following are repos in the Microsoft that either had extra commits
+    # or missing commits relative to GitHub API results as of 4/3/2017.
+    testrepos = ['airsim', 'al', 'bashonwindows',
+                 'ace', 'analysis-services', 'app-sushi']
+
+    # commits_datalake.csv = all commits from Commits.csv for these repos
+    #commits_audit_datalake(testrepos)
+
+    # commits_github.csv = all commits from GitHub API for these repos
+    #commits_audit_github(testrepos)
+
+    # commits_diff.csv = summary of differences between _datalake/_github data
+    commits_audit_diff2(testrepos) # note change to "version 2" variation
+
+def commits_audit_datalake(repos): #-----------------------------------------<<<
+    """Generate commits_datalake.csv file."""
+    open('commits_datalake.csv', 'w').write('org,repo,timestamp,committer,url,sha,urn,message\n')
+    myreader = csv.reader(open('/users/dmahugh/Documents/Commit.csv',
+                               'r', encoding='iso-8859-2'),
+                          delimiter=',', quotechar='"')
+    for values in myreader:
+        url = values[4]
+        org = url.split('/')[4].lower()
+        repo = url.split('/')[5].lower()
+        if org == 'microsoft' and repo in repos:
+            urn = values[0]
+            sha = values[3]
+            timestamp = values[9]
+            committer = values[11]
+            message = values[16]
+            print('{0}/{1} - {2}'.format(org, repo, timestamp))
+            outline = org + ',' + repo + ',' + timestamp + ',' + committer + ',' + \
+                url + ',' + sha + ',' + urn + ',"' + message.replace('"', '') + '"\n'
+            open('commits_datalake.csv', 'a', encoding='utf-8').write(outline)
+
+def commits_audit_diff(repos): #---------------------------------------------<<<
+    """Generate commits_diff.csv file."""
+    open('commits_diff.csv', 'w').write('org,repo,timestamp,url,datalake,github\n')
+    for repo in repos:
+        datalake = set() # set of timestamp/sha values that are in Data Lake data
+        for line in open('commits_datalake.csv').readlines():
+            values = line.split(',')
+            if len(values) >= 6 and values[1] == repo:
+                datalake.add(values[2][:19] + '/' + values[5])
+        github = set() # set of timestamp/sha values that are in GitHub data
+        for line in open('commits_github.csv').readlines():
+            values = line.split(',')
+            if len(values) >= 6 and values[1] == repo:
+                github.add(values[2][:19] + '/' + values[5])
+        commits = datalake.union(github)
+        for ts_sha in commits:
+            dl_exists = 'No'
+            gh_exists = 'No'
+            if ts_sha in datalake:
+                dl_exists = 'Yes'
+            if ts_sha in github:
+                gh_exists = 'Yes'
+            timestamp, sha = ts_sha.split('/')
+            url = 'https://api.github.com/repos/Microsoft/' + repo + '/commits/' + sha
+            open('commits_diff.csv', 'a', encoding='utf-8').write( \
+                'microsoft,' +  repo + ',' + timestamp + \
+                ',' + url + ',' + dl_exists + ',' + gh_exists + '\n')
+
+def commits_audit_diff2(repos): #--------------------------------------------<<<
+    """Generate commits_diff.csv file."""
+    # This "version 2" variation only uses the SHA value to check for existence,
+    # note the timestamp+sha approach we had used previously.
+    open('commits_diff.csv', 'w').write('org,repo,url,datalake,github\n')
+    for repo in repos:
+        datalake = set() # set of SHA values that are in Data Lake data
+        for line in open('commits_datalake.csv').readlines():
+            values = line.split(',')
+            if len(values) >= 6 and values[1] == repo:
+                datalake.add(values[5]) # SHA
+        github = set() # set of SHA values that are in GitHub data
+        for line in open('commits_github.csv').readlines():
+            values = line.split(',')
+            if len(values) >= 6 and values[1] == repo:
+                github.add(values[5]) # SHA
+        commits = datalake.union(github)
+        for sha in commits:
+            dl_exists = 'No'
+            gh_exists = 'No'
+            if sha in datalake:
+                dl_exists = 'Yes'
+            if sha in github:
+                gh_exists = 'Yes'
+            url = 'https://api.github.com/repos/Microsoft/' + repo + '/commits/' + sha
+            open('commits_diff.csv', 'a', encoding='utf-8').write( \
+                'microsoft,' +  repo + ',' + url + ',' + dl_exists + ',' + gh_exists + '\n')
+
+def commits_audit_github(repos): #-------------------------------------------<<<
+    """Generate commits_github.csv file."""
+    open('commits_github.csv', 'w').write('org,repo,timestamp,committer,url,sha,message\n')
+    for repo in repos:
+        print('retrieving all commits for microsoft/' + repo + ' ...')
+        endpoint = 'https://api.github.com/repos/microsoft/' + repo + \
+            '/commits?per_page=100'
+        authtuple = (setting('ghiverify', 'github', 'username'),
+                     setting('ghiverify', 'github', 'pat'))
+        commits = github_allpages(endpoint=endpoint, auth=authtuple)
+        for commit in commits:
+            timestamp = commit['commit']['committer']['date']
+            committer = commit['commit']['committer']['name']
+            url = commit['commit']['url']
+            sha = commit['sha']
+            message = commit['commit']['message']
+            outline = 'microsoft,' + repo + ',' + timestamp + ',' + committer + ',' + \
+                url + ',' + sha + ',"' + message.replace('"', '') + '"\n'
+            open('commits_github.csv', 'a', encoding='utf-8').write(outline)
 
 def data_sort(datadict): #---------------------------------------------------<<<
     """Sort function for output lists.
@@ -539,7 +652,7 @@ def repototal_commits(orgname, reponame): #----------------------------------<<<
     if not hasattr(_settings, 'repo_tot_commits'):
         # load dictionary first time this function is called
         _settings.repo_tot_commits = dict()
-        for line in open('repototals-2017-04-03.csv', 'r').readlines():
+        for line in open('repototals-2017-04-30.csv', 'r').readlines():
             orgrepo, _, _, commits = line.strip().split(',')
             _settings.repo_tot_commits[orgrepo.lower()] = int(commits)
     return _settings.repo_tot_commits.get( \
@@ -1058,10 +1171,10 @@ def test_commits_asofdate(): #-----------------------------------------------<<<
     #             ('microsoft/ghcrawler-datalake-etl', '2017-04-03'),
     #             ('Azure/azure-github-organization', '2017-04-03')]
     #for orgrepo, asof in testcases:
-    open('repo_commits_audit_2017-04-03.csv', 'w').write( \
+    open('repo_commits_audit_2017-04-30.csv', 'w').write( \
         'org,repo,datalake,github\n')
 
-    asof = '2017-04-03'
+    asof = '2017-04-30'
     for orgrepo in open('repos_in_repocsv.csv', 'r').readlines():
         orgrepo = orgrepo.lower().strip()
         org, repo = orgrepo.split('/')
@@ -1080,22 +1193,41 @@ def test_commits_asofdate(): #-----------------------------------------------<<<
         print(orgrepo.ljust(50) + ' - ' + asof + \
             ' - DataLake:{0:>6}, GitHub:{1:>6}'. \
             format(datalake_commits, github_commits) + ' ' + desc)
-        open('repo_commits_audit_2017-04-03.csv', 'a').write( \
+        open('repo_commits_audit_2017-04-30.csv', 'a').write( \
             ','.join([org, repo, str(datalake_commits), str(github_commits)]) + '\n')
 
 # code to be executed when running standalone (for ad-hoc testing, etc.)
 if __name__ == '__main__':
     sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
+
+    #sha_dict = dict()
+    #sha_dict['431a27a1f917b0c7c792518ef3bdb53821adab81'] = 'not found'
+    #sha_dict['c8b2c011c62ae101da1d5f744bf232e23b556277'] = 'not found'
+    #with open('/users/dmahugh/Documents/Commit.csv', 'r', encoding='iso-8859-2') as fhandle:
+    #    for line in fhandle:
+    #        for sha in sha_dict:
+    #            if sha in line:
+    #                print('FOUND: ' + sha)
+    #                sha_dict[sha] = 'FOUND'
+    #                break
+    #print(str(sha_dict))
+
     daily_diff()
+    #commits_audit()
     #test_commit_count_date()
     #test_commit_count_sincedate()
     #linkingdata_update()
     #verify_commit_order('dmahugh', 'gitdata')
 
-    #asof = '2017-04-03'
+    #asof = '2017-04-30'
     #infile = 'verification_activities_repo.csv'
     #outfile = 'repototals-' + asof + '.csv'
     #repototals_asofdate(infile, outfile, asof)
+
+    #myreader = csv.reader(open('Repo.csv', 'r', encoding='iso-8859-2'),
+    #                      delimiter=',', quotechar='"')
+    #for values in myreader:
+    #    print(values[4] + '/' + values[3])
 
     #test_commits_asofdate()
 
@@ -1130,3 +1262,4 @@ if __name__ == '__main__':
 
         print(','.join([*values, str(round(percent, 0)), match]))
     """
+
