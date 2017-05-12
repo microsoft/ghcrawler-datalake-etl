@@ -1,4 +1,6 @@
-This file should contain a list of the GitHub organizations being crawled by the current GHCrawler instance. The lines below are example - delete all contents of this file and replace with your own list of orgs before running the data verification scripts.
+This file should contain a list of the GitHub organizations being crawled by the current GHCrawler instance.
+The lines below are examples - delete all contents of this file and replace with your own list of orgs before
+running the data verification scripts.
 
 azure
 dotnet
