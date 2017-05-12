@@ -110,5 +110,5 @@ To install the data verification scripts, follow these steps:
 
 You should then be able to run the programs with these commands:
 
-```python repodiff.py``` = run the repo report
-```python audit.py``` = run the commits and issues reports
+* ```python repodiff.py``` = run the repo report
+* ```python audit.py``` = run the commits and issues reports
