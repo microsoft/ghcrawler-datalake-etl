@@ -1,21 +1,43 @@
 # GHCrawler data verification
 This folder contains tools for verifying the completeness and accuracy of the data
-being accumulated by GHCrawler.
+being accumulated by GHCrawler. These tools compare current results from the GitHub V3 APIs
+with data in the GHInsightsMS data set, in the box labeled _Data Verification_ in this diagram:
 
-## general approach
+![data pipeline](misc/datapipeline.png)
 
-The general concept is that CSV files are generated from key steps in the data
-pipeline, and the contents of these files are compared against the current results
-returned by the GitHub API.
+The CSV files in the _/TabularSource2_ folder of the _ghinsightsms_ ADLS account are generated each
+day by Data Lake U-SQL scripts, and those CSV files are then ingested into a tabular cube in SQL
+Server Analysis Services (SSAS). We compare those CSV files with the current results
+returned by the GitHub API, and generate reports that summarize any differences found.
 
-This is a work in progress, and more thorough documentation will be provided later.
+w## repo verification
 
-## authentication details
+/// repodiff.py
+/// link to examples in data-verification folder
 
-Note that ```ghiverify.py``` requires authentication for Azure Data Lake access
+## counting commits and issues
+
+/// frame the problem
+
+/// counting-paged-entities.pptx
+
+/// audit.py
+/// link to examples in data-verification folder
+
+## source files
+
+/// brief description of each .py file
+
+## authentication
+
+/// rename ghiverify - ghinsightsms.ini
+
+/// put a sample ini file in the misc folder
+
+These programs require authentication for Azure Data Lake access
 (via Azure Active Directory) and the GitHub API (via a username/personal access token).
-These details are stored in a local file named ```ghiverify.ini``` that is stored in a
-sibling folder (subdir of the parent) named ```_private```. Here is an example of the
+Credentials are stored in a local file named _ghiverify.ini_ that is stored in a
+sibling folder (subdir of the parent) named __private_. Here is an example of the
 structure of the INI file:
 
 ```
@@ -33,3 +55,11 @@ client-secret = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
 
 client-id = xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
+
+## installation
+
+/// git clone
+
+/// create folders: data, data-verification, ..\_private
+
+/// install python and dependencies
