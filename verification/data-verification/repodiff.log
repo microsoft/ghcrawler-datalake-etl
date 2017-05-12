@@ -1,0 +1,8 @@
+2017-05-11 23:26:32.41 ---------- Data Verification for 2017-05-11 ----------
+2017-05-11 23:26:38.57 Download Repo.csv from Data Lake .......   6.1 seconds, 8,100,069 bytes
+2017-05-11 23:28:03.60 Get live data from GitHub API ..........  85.0 seconds, 514,872 bytes
+2017-05-11 23:28:08.71 Generate repodiff-2017-05-11.csv .......   5.1 seconds, 20,032 bytes
+2017-05-11 23:28:08.73                         Missing:      36 Repos
+2017-05-11 23:28:08.73                         Extra:       312 Repos
+2017-05-11 23:28:11.38 Upload repodiff.csv to Data Lake .......   2.6 seconds
+2017-05-11 23:28:11.39 Total elapsed time ---------------------  99.0 seconds
