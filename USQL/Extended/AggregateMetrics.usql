@@ -124,6 +124,39 @@ WHERE   State == "closed" AND
         ClosedAt > @Yesterday
 GROUP BY RepoUrn;
 
+@PullRequestsFirstComment =
+SELECT  Urn,
+        MIN(CreatedAt) AS FirstCommentCreatedAt
+FROM GHInsights.dbo.PullRequestComment
+GROUP BY Urn;
+
+@PullRequestsResponseDays =
+SELECT  RepoUrn,
+        pr.Urn,
+        ((DateTime)pr.UpdatedAt - (DateTime)pr.CreatedAt).TotalDays AS DaysToLastUpdated,
+        (prfc.FirstCommentCreatedAt IS NULL ? 0 : ((DateTime)prfc.FirstCommentCreatedAt - (DateTime)pr.CreatedAt).TotalDays) AS DaysToFirstComment
+FROM GHInsights.dbo.PullRequest AS pr
+LEFT JOIN @PullRequestsFirstComment AS prfc ON pr.Urn == prfc.Urn;
+
+@PullRequestsFirstResponse =
+SELECT  RepoUrn,
+        Urn,
+        (DaysToLastUpdated != 0 AND DaysToFirstComment != 0) ? Math.Min(DaysToLastUpdated, DaysToFirstComment) : Math.Max(DaysToLastUpdated, DaysToFirstComment) AS DaysToFirstResponse
+FROM @PullRequestsResponseDays;
+
+@PullRequestsAvgFirstResponseByRepos =
+SELECT  RepoUrn,
+        AVG(DaysToFirstResponse) AS AvgDaysForFirstResponseToPullRequests
+FROM @PullRequestsFirstResponse
+WHERE DaysToFirstResponse != 0
+GROUP BY RepoUrn;
+
+@AllContributorsByRepos =
+SELECT  RepoUrn,
+        COUNT(UniqueUrn) AS Contributors
+FROM GHInsights.dbo.RepoContributors
+GROUP BY RepoUrn;
+
 @AllOrgs =
 SELECT  OrgId,
         Login AS OrgName
@@ -161,7 +194,9 @@ SELECT  RepoId,
         (ClosedPullRequests IS NULL ? 0 : ClosedPullRequests) AS ClosedPullRequests,
         AvgDaysToClosePullRequests,
         (PullRequestsOpenedToday IS NULL ? 0 : PullRequestsOpenedToday) AS PullRequestsOpenedToday,
-        (PullRequestsClosedToday IS NULL ? 0 : PullRequestsClosedToday) AS PullRequestsClosedToday
+        (PullRequestsClosedToday IS NULL ? 0 : PullRequestsClosedToday) AS PullRequestsClosedToday,
+        AvgDaysForFirstResponseToPullRequests,
+        (Contributors IS NULL ? 0 : Contributors) AS Contributors
 FROM @AllRepos AS r
 LEFT JOIN @AllCommitsByRepos AS ac ON r.RepoUrn == ac.RepoUrn
 LEFT JOIN @CommitsTodayByRepos AS ct ON r.RepoUrn == ct.RepoUrn
@@ -174,7 +209,9 @@ LEFT JOIN @AllPullRequestsByRepos AS apr ON r.RepoUrn == apr.RepoUrn
 LEFT JOIN @AllOpenPullRequestsByRepos AS aopr ON r.RepoUrn == aopr.RepoUrn
 LEFT JOIN @AllClosedPullRequestsByRepos AS acpr ON r.RepoUrn == acpr.RepoUrn
 LEFT JOIN @PullRequestsOpenedTodayByRepos AS prot ON r.RepoUrn == prot.RepoUrn
-LEFT JOIN @PullRequestsClosedTodayByRepos AS prct ON r.RepoUrn == prct.RepoUrn;
+LEFT JOIN @PullRequestsClosedTodayByRepos AS prct ON r.RepoUrn == prct.RepoUrn
+LEFT JOIN @PullRequestsAvgFirstResponseByRepos AS prafr ON r.RepoUrn == prafr.RepoUrn
+LEFT JOIN @AllContributorsByRepos AS acon ON r.RepoUrn == acon.RepoUrn;
 
 OUTPUT @RepoMetricsData
 TO "wasb://metrics@ospobackup/repos.csv"
@@ -201,7 +238,9 @@ SELECT  OrgId,
         (SUM(ClosedPullRequests) IS NULL ? 0 : SUM(ClosedPullRequests)) AS ClosedPullRequests,
         AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
         (SUM(PullRequestsOpenedToday) IS NULL ? 0 : SUM(PullRequestsOpenedToday)) AS PullRequestsOpenedToday,
-        (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday
+        (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday,
+        AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
+        (SUM(Contributors) IS NULL ? 0 : SUM(Contributors)) AS Contributors
 FROM @RepoMetricsData
 GROUP BY OrgId, OrgName;
 
@@ -228,7 +267,9 @@ SELECT  SUM(Subscribers) AS Subscribers,
         SUM(ClosedPullRequests) AS ClosedPullRequests,
         AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
         SUM(PullRequestsOpenedToday) AS PullRequestsOpenedToday,
-        SUM(PullRequestsClosedToday) AS PullRequestsClosedToday
+        SUM(PullRequestsClosedToday) AS PullRequestsClosedToday,
+        AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
+        SUM(Contributors) AS Contributors
 FROM @OrgsMetricsData;
 
 OUTPUT @AllMetricsData
