@@ -102,13 +102,15 @@ A template for setting up your INI file can be found here: [ghinsights.ini](http
 
 To install the data verification scripts, follow these steps:
 
-* Install the latest version of Python from [Python.org](https://www.python.org/)
+* Install the latest version of Python from [Python.org](https://www.python.org/). Be sure the check the box to add Python to the path, or if you prefer you can leave that un-checked and use a virtual environment. (The use of virtual environments is not covered here &mdash; if you're not familiar with them, just add Python to your path to run these scripts.)
 * Clone the repo: ```git clone https://github.com/Microsoft/ghcrawler-datalake-etl.git```
 * Configure the ghinsights.ini file (found in the _misc_ folder) and then put it in a folder named _..\private_ relative to the root folder of the project
 * Edit the _orgs.txt_ file in the data folder, to add the GitHub organizations you're crawling/verifying
-* Install the Python package dependencies: ```pip install -r requirements.txt``` in the root folder
+* Install the Python package dependencies: ```pip install -r requirements.txt``` in the root folder. NOTE: if you're on a platform that comes with Python pre-installed, you'll need to use the command ```pip3``` instead of ```pip```.
 
 You should then be able to run the programs with these commands:
 
 * ```python repodiff.py``` = run the repo report
 * ```python audit.py``` = run the commits and issues reports
+
+NOTE: if you're on a platform that comes with Python pre-installed, you'll need to use the command ```python3``` instead of ```python```.
