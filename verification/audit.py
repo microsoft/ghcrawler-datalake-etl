@@ -123,6 +123,8 @@ def commits_asofdate_github(org, repo, asofdate): #--------------------------<<<
     endpoint = 'https://api.github.com/repos/' + org + '/' + repo + \
         '/commits?per_page=100&page=1'
     firstpage = requests_session.get(endpoint, headers=v3api)
+    if not firstpage.text:
+        return 0 # sometimes (rarely) we get a None here - not sure why
     pagelinks = github_pagination(firstpage)
     totpages = int(pagelinks['lastpage'])
     lastpage_url = pagelinks['lastURL']
@@ -168,7 +170,7 @@ def console_output(org, repo, asofdate, dl_count, gh_count):
         desc = 'extra'
     else:
         desc = 'MISSING'
-    return (org + '/' + repo).ljust(50) + ' - ' + asofdate + \
+    return (org + '/' + repo)[:50].ljust(50) + ' - ' + asofdate + \
         ' - DataLake:{0:>6}, GitHub:{1:>6}'. \
         format(dl_count, gh_count) + ' ' + desc
 
@@ -254,6 +256,8 @@ def issues_asofdate_github(org, repo, asofdate): #---------------------------<<<
     endpoint = 'https://api.github.com/repos/' + org + '/' + repo + \
         '/issues?filter=all&state=all&per_page=100&page=1'
     firstpage = requests_session.get(endpoint, headers=v3api)
+    if not firstpage.text:
+        return 0 # sometimes (rarely) we get a None here - not sure why
     pagelinks = github_pagination(firstpage)
     totpages = int(pagelinks['lastpage'])
     lastpage_url = pagelinks['lastURL']
