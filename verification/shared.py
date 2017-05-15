@@ -151,9 +151,13 @@ def get_asofdate(): #--------------------------------------------------------<<<
     adls_fs_client = \
         core.AzureDLFileSystem(token, store_name=adls_account)
     filename = '/TabularSource2/Repo.csv'
+    # get the timestamp (seconds) for this file in ADLS file system ...
     timestamp_seconds = int(adls_fs_client.info(filename)['modificationTime'])/1000
+    # convert that to a datetime object ...
     timestamp = datetime.datetime.fromtimestamp(timestamp_seconds)
+    # subtract a day ...
     asof_datetime = timestamp - datetime.timedelta(days=1)
+    # return first 10 characters as a string (YYYY-MM-DD) ...
     return str(asof_datetime)[:10]
 
 def github_allpages(endpoint=None, auth=None, #------------------------------<<<
