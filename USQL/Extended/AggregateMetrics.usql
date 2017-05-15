@@ -64,6 +64,7 @@ GROUP BY RepoUrn;
 SELECT  IssueUrn,
         MIN(CreatedAt) AS FirstCommentCreatedAt
 FROM GHInsights.dbo.IssueComment
+WHERE DeletedAt IS NULL
 GROUP BY IssueUrn;
 
 @IssuesResponseDays =
@@ -128,6 +129,7 @@ GROUP BY RepoUrn;
 SELECT  Urn,
         MIN(CreatedAt) AS FirstCommentCreatedAt
 FROM GHInsights.dbo.PullRequestComment
+WHERE DeletedAt IS NULL
 GROUP BY Urn;
 
 @PullRequestsResponseDays =
@@ -160,7 +162,8 @@ GROUP BY RepoUrn;
 @AllOrgs =
 SELECT  OrgId,
         Login AS OrgName
-FROM GHInsights.dbo.Org;
+FROM GHInsights.dbo.Org
+WHERE DeletedAt IS NULL;
 
 @AllRepos =
 SELECT  Urn AS RepoUrn,
