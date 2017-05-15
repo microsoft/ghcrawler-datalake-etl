@@ -25,7 +25,7 @@ class _settings: #-----------------------------------------------------------<<<
     last_remaining = 0 # remaining portion of rate limit after last API call
 
 def audit_reports(asofdate, orgfilter): #------------------------------------<<<
-    """Audit the total number of commits and issues by repo.
+    """Audit the total number of commits, issues, and pull requests by repo.
 
     asofdate = the date for which totals will be calculate. Typically this is
     the day prior to the current date, since the /TabularSource2 files are
@@ -44,6 +44,7 @@ def audit_reports(asofdate, orgfilter): #------------------------------------<<<
     generate_totals = True # re-generate repo totals from daily totals?
     report_commits = True # generate the commits report?
     report_issues = True # generate the issues report?
+    report_prs = True # generate the pull requests report?
 
     # local file where Data Lake daily totals are stored ...
     local_dailytots = 'data/verification_activities_repo.csv'
@@ -72,6 +73,10 @@ def audit_reports(asofdate, orgfilter): #------------------------------------<<<
     if report_issues:
         issue_report(asofdate, \
             'data-verification/audit_issues_' + asofdate + '.csv', orgfilter)
+
+    if report_prs:
+        pr_report(asofdate, \
+            'data-verification/audit_pullrequests_' + asofdate + '.csv', orgfilter)
 
 def commit_report(asofdate, reportfile, orgfilter): #------------------------<<<
     """Generate a report summarizing commit counts."""
@@ -295,9 +300,98 @@ def issues_asofdate_github(org, repo, asofdate): #---------------------------<<<
 
     return (totpages - pageno - 1) * 100 + issues_firstpage + issues_lastpage
 
+def pr_report(asofdate, reportfile, orgfilter): #-------------------------<<<
+    """Generate a report summarizing pull request counts."""
+
+    # write header row to output file
+    open(reportfile, 'w').write('org,repo,datalake,github\n')
+
+    reporeader = csv.reader(open('data/Repo.csv', 'r', encoding='iso-8859-2'),
+                            delimiter=',', quotechar='"')
+    for values in reporeader:
+        org, repo = values[11].split('/')
+
+        if (orgfilter and not org.lower() in orgfilter) or \
+            documentation_repo(repo):
+            continue
+        github_prs = prs_asofdate_github(org, repo, asofdate)
+        datalake_prs = prs_asofdate_datalake(org, repo, asofdate)
+        print(console_output(org, repo, asofdate, datalake_prs, github_prs))
+
+        # add this data row to the output file
+        open(reportfile, 'a').write( \
+            ','.join([org, repo, str(datalake_prs), str(github_prs)]) + '\n')
+
+def prs_asofdate_datalake(orgname, reponame, asofdate): #-----------------<<<
+    """Get a total # pull requests from a repo totals data file created by
+    dailytotals(). (Fields: org/repo, issues, pullrequests, commits.)"""
+    if not hasattr(_settings, 'repo_tot_prs'):
+        # load dictionary first time this function is called
+        _settings.repo_tot_prs = dict()
+        for line in open('data-verification/repototals-' + asofdate + '.csv', 'r').readlines():
+            orgrepo, _, prs, _ = line.strip().split(',')
+            _settings.repo_tot_prs[orgrepo.lower()] = int(prs)
+    return _settings.repo_tot_prs.get( \
+        orgname.lower() + '/' + reponame.lower(), 0)
+
+def prs_asofdate_github(org, repo, asofdate): #---------------------------<<<
+    """Return cumulative # of pull requests for an org/repo as of a date.
+
+    This is an optimized approach that is based on the assumption that there
+    are relatively few commits after asofdate. Performance should be good for
+    recent asofdate values.
+    """
+    requests_session = requests.session()
+    requests_session.auth = (setting('ghinsights', 'github', 'username'),
+                             setting('ghinsights', 'github', 'pat'))
+    v3api = {"Accept": "application/vnd.github.v3+json"}
+
+    # handle first page
+    endpoint = 'https://api.github.com/repos/' + org + '/' + repo + \
+        '/pulls?state=all&per_page=100&page=1'
+    firstpage = requests_session.get(endpoint, headers=v3api)
+    if not firstpage.text:
+        return 0 # sometimes (rarely) we get a None here - not sure why
+    pagelinks = github_pagination(firstpage)
+    totpages = int(pagelinks['lastpage'])
+    lastpage_url = pagelinks['lastURL']
+    jsondata = json.loads(firstpage.text)
+
+    if 'git repository is empty' in str(jsondata).lower() or \
+        'not found' in str(jsondata).lower():
+        return 0
+    prs_firstpage = len([pr for pr in jsondata \
+        if pr['created_at'][:10] <= asofdate])
+
+    if not lastpage_url:
+        # just one page of results for this repo
+        return prs_firstpage
+
+    # handle last page
+    lastpage = requests_session.get(lastpage_url, headers=v3api)
+    prs_lastpage = len([pr for pr in json.loads(lastpage.text) \
+        if pr['created_at'][:10] <= asofdate])
+    if not prs_lastpage:
+        return 0 # there are no pull requests before asofdate for this repo
+
+    # scan back from first page to find start of the desired date range
+    pageno = 1
+    while jsondata[-1]['created_at'][:10] > asofdate:
+        pageno += 1
+
+        # convert endpoint into the endpoint for page # pageno ...
+        endpoint = '&'.join(endpoint.split('&')[:-1]) + '&page=' + str(pageno)
+
+        thispage = requests_session.get(endpoint, headers=v3api)
+        jsondata = json.loads(thispage.text)
+        prs_firstpage = len([pr for pr in jsondata \
+            if pr['created_at'][:10] <= asofdate])
+
+    return (totpages - pageno - 1) * 100 + prs_firstpage + prs_lastpage
+
 # code to be executed when running standalone
 if __name__ == '__main__':
     # set console encoding to UTF8
     sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
-    audit_reports('2017-05-10', ['microsoft'])
+    audit_reports(get_asofdate(), ['microsoft'])

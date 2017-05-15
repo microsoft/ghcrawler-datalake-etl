@@ -114,6 +114,7 @@ def repo_data(filename): #---------------------------------------------------<<<
     and consistent data set for comparison. All values are lower-case, and
     timestamp is trimmed to YYYY-MM-DD.
     """
+    asofdate = get_asofdate()
     dataset = []
     encoding_type = 'ISO-8859-2' if 'datalake' in filename else 'UTF-8'
     firstline = 'github' in filename
@@ -138,9 +139,13 @@ def repo_data(filename): #---------------------------------------------------<<<
             repo_id = values[2]
             created_at = values[3][:10]
 
-        # don't include documentation repos or repos created today
-        if not documentation_repo(repo_name) and not created_at == yyyy_mm_dd():
-            dataset.append((org, repo_name, repo_id, created_at))
+        if documentation_repo(repo_name):
+            continue # don't include documentation repos
+
+        if created_at[:10] > asofdate:
+            continue # don't include repos created after asofdate
+
+        dataset.append((org, repo_name, repo_id, created_at))
 
     return dataset
 
@@ -207,7 +212,7 @@ if __name__ == '__main__':
     sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
     start_time = default_timer()
-    datestr = yyyy_mm_dd()
+    datestr = get_asofdate()
     datalake_csv = '/TabularSource2/Repo.csv'
     datalake_csv_local = 'data/repo-datalake-' + datestr + '.csv'
     github_csv = 'data/repo-github-' + datestr + '.csv'

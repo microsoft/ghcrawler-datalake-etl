@@ -5,6 +5,7 @@ Licensed under the MIT License.
 # shared code used by the data verification programs
 import configparser
 import csv
+import datetime
 import json
 import os
 import re
@@ -141,6 +142,20 @@ def filesize(filename): #----------------------------------------------------<<<
     """
     return os.stat(filename).st_size
 
+def get_asofdate(): #--------------------------------------------------------<<<
+    """Get the most recent complete day prior to the timestamp of the Repo.csv
+    file in Azure Data Lake Store.
+    """
+    token, _ = azure_datalake_token('ghinsights')
+    adls_account = setting('ghinsights', 'azure', 'adls-account')
+    adls_fs_client = \
+        core.AzureDLFileSystem(token, store_name=adls_account)
+    filename = '/TabularSource2/Repo.csv'
+    timestamp_seconds = int(adls_fs_client.info(filename)['modificationTime'])/1000
+    timestamp = datetime.datetime.fromtimestamp(timestamp_seconds)
+    asof_datetime = timestamp - datetime.timedelta(days=1)
+    return str(asof_datetime)[:10]
+
 def github_allpages(endpoint=None, auth=None, #------------------------------<<<
                     headers=None, state=None, session=None):
 
@@ -162,6 +177,7 @@ def github_allpages(endpoint=None, auth=None, #------------------------------<<<
             headers=headers, state=state, session=session)
         if (state and state.verbose) or response.status_code != 200:
             # note that status code is always displayed if not 200/OK
+            print('>>> endpoint: {0}'.format(endpoint))
             print('      Status: {0}, {1} bytes returned'. \
                 format(response, len(response.text)))
         if response.ok:
