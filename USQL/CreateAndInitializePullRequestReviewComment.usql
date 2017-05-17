@@ -38,7 +38,7 @@ WHERE EntityName == "review_comment";
 
 @PullRequestCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @PullRequestComment;
 
 DROP TABLE IF EXISTS dbo.PullRequestComment;

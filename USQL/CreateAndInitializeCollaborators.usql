@@ -21,7 +21,7 @@ WHERE EntityName == "collaborators";
 
 @UniqueNumberedCollaborators =
 SELECT   UniqueUrn
-        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawCollaborators;
 
 @UniqueMostRecentCollaborators = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedCollaborators WHERE RowNumber == 1;
