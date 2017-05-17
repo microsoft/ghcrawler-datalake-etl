@@ -6,6 +6,7 @@ Licensed under the MIT License.
 import configparser
 import csv
 import datetime
+import gzip
 import json
 import os
 import re
