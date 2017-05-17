@@ -2,3 +2,9 @@
 ghcrawler-datalake-etl_settings.json
 *.sln
 *.usqlproj
+
+# Python verification script
+_private/
+__pycache__/
+*.csv
+*.log
