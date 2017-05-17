@@ -72,7 +72,7 @@ FROM @ViewsPrePivot;
 // FROM GHInsights.dbo.Views;
 
 @ViewsDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY EtlIngestDate DESC) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @ViewsPivoted;
 
 

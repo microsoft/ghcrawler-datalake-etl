@@ -19,7 +19,7 @@ WHERE EntityName == "GollumEvent";
 
 @EventPayloadPageDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawEventPayloadPage;
 
 @EventPayloadPageExplode =

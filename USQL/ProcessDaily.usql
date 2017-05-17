@@ -38,7 +38,7 @@ AND   IngestDate == @IngestDatePartition;
 
 @UniqueNumberedCollaborators =
 SELECT   UniqueUrn
-        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawCollaborators;
 
 @UniqueMostRecentCollaborators = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedCollaborators WHERE RowNumber == 1;
@@ -136,7 +136,7 @@ FROM dbo.Commit;
 
 @CommitDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @Commit;
 
 TRUNCATE TABLE dbo.Commit;
@@ -213,7 +213,7 @@ FROM dbo.CommitComment;
 
 @CommitCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @CommitComment;
 
 TRUNCATE TABLE dbo.CommitComment;
@@ -265,7 +265,7 @@ AND IngestDate == @IngestDatePartition;
 
 @CommitDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawCommit;
 
 /////////////////////////////////////////////////////////////////////////
@@ -326,7 +326,7 @@ UNION ALL
 SELECT * FROM dbo.CommitFile;
 
 @CommitFileDeDupe = SELECT *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
         FROM @CommitFile;
 
 TRUNCATE TABLE dbo.CommitFile;
@@ -403,7 +403,7 @@ UNION ALL
 SELECT * FROM dbo.CommitParent;
 
 @CommitParentDeDupe = SELECT *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
         FROM @CommitParent;
 
 INSERT INTO dbo.CommitParent
@@ -441,7 +441,7 @@ AND IngestDate == @IngestDatePartition;
 
 @UniqueNumberedContributors =
 SELECT   UniqueUrn
-        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawContributors;
 
 @UniqueMostRecentContributors = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedContributors WHERE RowNumber == 1;
@@ -640,7 +640,7 @@ SELECT * FROM dbo.Event;
 
 @EventDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @Event;
 
 TRUNCATE TABLE dbo.Event;
@@ -800,7 +800,7 @@ AND IngestDate == @IngestDatePartition;
 
 @EventCommitDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawEventCommit;
 
 @EventPayloadCommitExplode =
@@ -852,7 +852,7 @@ SELECT *
 FROM dbo.EventPayloadCommit;
 
 @EventPayloadCommitDeDupe = SELECT *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
         FROM @EventPayloadCommit;
 
 TRUNCATE TABLE dbo.EventPayloadCommit;
@@ -896,7 +896,7 @@ AND IngestDate == @IngestDatePartition;
 
 @EventPayloadIssueLabelDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawEventPayloadIssueLabel;
 
 @EventPayloadIssueLabelExplode =
@@ -945,7 +945,7 @@ SELECT *
 FROM dbo.EventPayloadIssueLabel;
 
 @EventPayloadIssueLabelDeDupe = SELECT *
-,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @EventPayloadIssueLabel;
 
 TRUNCATE TABLE dbo.EventPayloadIssueLabel;
@@ -983,7 +983,7 @@ AND IngestDate == @IngestDatePartition;
 
 @EventPayloadPageDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawEventPayloadPage;
 
 @EventPayloadPageExplode =
@@ -1048,7 +1048,7 @@ FROM dbo.EventPayloadPage;
 
 @EventPayloadPageDeDupe =
 SELECT *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @EventPayloadPage;
 
 TRUNCATE TABLE dbo.EventPayloadPage;
@@ -1209,7 +1209,7 @@ FROM dbo.EventPayloadPullRequest;
 
 @EventPRDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @EventPR;
 
 TRUNCATE TABLE dbo.EventPayloadPullRequest;
@@ -1362,7 +1362,7 @@ AND IngestDate == @IngestDatePartition;
 
 @EventPayloadReleaseAssetDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawEventPayloadReleaseAsset;
 
 @EventPayloadReleaseAssetExplode =
@@ -1420,7 +1420,7 @@ SELECT *
 FROM dbo.EventPayloadReleaseAsset;
 
 @EventPayloadReleaseAssetDeDupe = SELECT *
-,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @EventPayloadReleaseAsset;
 
 TRUNCATE TABLE dbo.EventPayloadReleaseAsset;
@@ -1511,7 +1511,7 @@ FROM dbo.Issue;
 
 @IssueDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @Issue;
 
 TRUNCATE TABLE dbo.Issue;
@@ -1602,7 +1602,7 @@ FROM dbo.IssueComment;
 
 @IssueCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @IssueComment;
 
 TRUNCATE TABLE dbo.IssueComment;
@@ -1648,7 +1648,7 @@ AND IngestDate == @IngestDatePartition;
 
 @IssueLabelDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawIssueLabel;
 
 @IssueLabelExplode =
@@ -1706,7 +1706,7 @@ SELECT  IssueUrn
 FROM dbo.IssueLabel;
 
 @IssueLabelDeDupe = SELECT *
-        ,ROW_NUMBER() OVER (PARTITION BY IssueUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY IssueUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
         FROM @IssueLabel;
 
 TRUNCATE TABLE dbo.IssueLabel;
@@ -1868,7 +1868,7 @@ SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS OrgId
         ,GHInsights.USql.Utility.GetString(Data, "description") AS Description
-        ,GHInsights.USql.Utility.GetBoolean(Data, "name") AS Name
+        ,GHInsights.USql.Utility.GetString(Data, "name") AS Name
         ,GHInsights.USql.Utility.GetString(Data, "company") AS Company
         ,GHInsights.USql.Utility.GetString(Data, "blog") AS Blog
         ,GHInsights.USql.Utility.GetPiiString(Data, "email") AS Email
@@ -1908,7 +1908,7 @@ FROM dbo.Org;
 
 @OrgDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @Org;
 
 TRUNCATE TABLE dbo.Org;
@@ -2113,7 +2113,7 @@ FROM dbo.PullRequest;
 
 @PullRequestDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @PullRequest;
 
 TRUNCATE TABLE dbo.PullRequest;
@@ -2311,7 +2311,7 @@ FROM dbo.PullRequestCommit;
 
 @PRCommitDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @PRCommit;
 
 TRUNCATE TABLE dbo.PullRequestCommit;
@@ -2375,7 +2375,7 @@ AND IngestDate == @IngestDatePartition;
 
 @UniqueNumberedMap =
 SELECT   UniqueUrn
-        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawMap;
 
 @UniqueMostRecentMap = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedMap WHERE RowNumber == 1;
@@ -2469,7 +2469,7 @@ FROM dbo.PullRequestComment;
 
 @PullRequestCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @PullRequestComment;
 
 TRUNCATE TABLE dbo.PullRequestComment;
@@ -2629,12 +2629,12 @@ AND IngestDate == @IngestDatePartition;
 
 @RepoDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RepoUnified;
 
 @RepoLogDeDupe =
 SELECT *
-	,ROW_NUMBER() OVER (PARTITION BY EtlSourceId, UpdatedAt ORDER BY ProcessedAt DESC) AS RowNumber
+	,ROW_NUMBER() OVER (PARTITION BY EtlSourceId, UpdatedAt ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 	FROM @RepoLogUnified;
 
 TRUNCATE TABLE dbo.Repo;
@@ -3120,7 +3120,7 @@ FROM dbo.Team;
 
 @TeamDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @Team;
 
 TRUNCATE TABLE dbo.Team;
@@ -3188,7 +3188,7 @@ FROM dbo.User;
 
 @UserDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC ) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC ) AS RowNumber
 FROM @User;
 
 TRUNCATE TABLE dbo.User;
@@ -3294,7 +3294,7 @@ SELECT *
 FROM GHInsights.dbo.Clones;
 
 @ClonesDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY EtlIngestDate DESC) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @ClonesPivoted;
 
 
@@ -3572,7 +3572,7 @@ SELECT *
 FROM GHInsights.dbo.Views;
 
 @ViewsDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY EtlIngestDate DESC) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @ViewsPivoted;
 
 

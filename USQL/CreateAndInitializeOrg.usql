@@ -11,7 +11,7 @@ SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS OrgId
         ,GHInsights.USql.Utility.GetString(Data, "description") AS Description
-        ,GHInsights.USql.Utility.GetBoolean(Data, "name") AS Name
+        ,GHInsights.USql.Utility.GetString(Data, "name") AS Name
         ,GHInsights.USql.Utility.GetString(Data, "company") AS Company
         ,GHInsights.USql.Utility.GetString(Data, "blog") AS Blog
         ,GHInsights.USql.Utility.GetPiiString(Data, "email") AS Email
@@ -47,7 +47,7 @@ WHERE EntityName == "org";
 
 @OrgDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @Org;
 
 DROP TABLE IF EXISTS dbo.Org;

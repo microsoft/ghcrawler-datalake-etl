@@ -135,7 +135,7 @@ WHERE EntityName LIKE "PullRequest%Event";
 
 @EventPRDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @EventPR;
 
 DROP TABLE IF EXISTS dbo.EventPayloadPullRequest;

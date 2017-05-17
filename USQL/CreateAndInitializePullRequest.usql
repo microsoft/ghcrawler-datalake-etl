@@ -154,7 +154,7 @@ WHERE EntityName == "pull_request";
 
 @PullRequestDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @PullRequest;
 
 DROP TABLE IF EXISTS dbo.PullRequest;

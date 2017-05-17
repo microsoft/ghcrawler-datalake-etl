@@ -22,7 +22,7 @@ WHERE EntityName == "commits" AND Urn LIKE "%pull_request%";
 
 @UniqueNumberedMap =
 SELECT   UniqueUrn
-        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @RawMap;
 
 @UniqueMostRecent = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedMap WHERE RowNumber == 1;

@@ -30,7 +30,7 @@ WHERE EntityName == "issue_comment";
 
 @IssueCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
 FROM @IssueComment;
 
 DROP TABLE IF EXISTS dbo.IssueComment;

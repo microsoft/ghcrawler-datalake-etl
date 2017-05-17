@@ -36,7 +36,7 @@ WHERE EntityName == "user";
 
 @UserDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY ProcessedAt DESC ) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC ) AS RowNumber
 FROM @User;
 
 DROP TABLE IF EXISTS dbo.User;
