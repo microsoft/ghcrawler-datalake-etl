@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+from timeit import default_timer
 
 import requests
 
@@ -49,34 +50,60 @@ def audit_reports(asofdate, orgfilter): #------------------------------------<<<
     # local file where Data Lake daily totals are stored ...
     local_dailytots = 'data/verification_activities_repo.csv'
 
+    elapsed_start = default_timer()
+
     if download_datalake:
-        print('Downloading daily totals from Data Lake ...')
+        print('\n--- Downloading files from Data Lake to /data folder: ---')
+
+        print('verification_activities_repo.csv ........ ', end='')
+        start_time = default_timer()
         token, _ = azure_datalake_token('ghinsights')
         adls_account = setting('ghinsights', 'azure', 'adls-account')
         datalake_get_file(local_dailytots, \
             '/TabularSource2/verification_activities_repo.csv', adls_account, token)
-        print('Downloading repo data from Data Lake ...')
+        print('{0:7,} seconds'.format(int(default_timer() - start_time)))
+
+        print('Repo.csv ................................ ', end='')
+        start_time = default_timer()
         token, _ = azure_datalake_token('ghinsights')
         adls_account = setting('ghinsights', 'azure', 'adls-account')
         datalake_get_file('data/Repo.csv', '/TabularSource2/Repo.csv', \
             adls_account, token)
+        print('{0:7,} seconds'.format(int(default_timer() - start_time)))
+
+    print('\n--- Generating reports in /data-verification folder: ----')
 
     if generate_totals:
-        print('Aggregating daily totals into repo totals ...')
+        print('repototals-' + asofdate + '.csv ............... ', end='')
+        start_time = default_timer()
         dailytotals(local_dailytots, \
             'data-verification/repototals-' + asofdate + '.csv', asofdate)
+        print('{0:7,} seconds'.format(int(default_timer() - start_time)))
 
     if report_commits:
+        print('audit_commits-' + asofdate + '.csv ............ ', end='')
+        start_time = default_timer()
         commit_report(asofdate, \
             'data-verification/audit_commits_' + asofdate + '.csv', orgfilter)
+        print('{0:7,} seconds'.format(int(default_timer() - start_time)))
 
     if report_issues:
+        print('audit_issues-' + asofdate + '.csv ............. ', end='')
+        start_time = default_timer()
         issue_report(asofdate, \
             'data-verification/audit_issues_' + asofdate + '.csv', orgfilter)
+        print('{0:7,} seconds'.format(int(default_timer() - start_time)))
 
     if report_prs:
+        print('audit_pullrequests-' + asofdate + '.csv ....... ', end='')
+        start_time = default_timer()
         pr_report(asofdate, \
             'data-verification/audit_pullrequests_' + asofdate + '.csv', orgfilter)
+        print('{0:7,} seconds'.format(int(default_timer() - start_time)))
+
+    print('\n' + 22*' ' + 'TOTAL ELAPSED TIME: {0:7,} seconds'. \
+        format(int(default_timer() - elapsed_start)))
+
 
 def commit_report(asofdate, reportfile, orgfilter): #------------------------<<<
     """Generate a report summarizing commit counts."""
@@ -94,7 +121,7 @@ def commit_report(asofdate, reportfile, orgfilter): #------------------------<<<
             continue
         github_commits = commits_asofdate_github(org, repo, asofdate)
         datalake_commits = commits_asofdate_datalake(org, repo, asofdate)
-        print(console_output(org, repo, asofdate, datalake_commits, github_commits))
+        #print(console_output(org, repo, asofdate, datalake_commits, github_commits))
 
         # add this data row to the output file
         open(reportfile, 'a').write( \
@@ -227,7 +254,7 @@ def issue_report(asofdate, reportfile, orgfilter): #-------------------------<<<
             continue
         github_issues = issues_asofdate_github(org, repo, asofdate)
         datalake_issues = issues_asofdate_datalake(org, repo, asofdate)
-        print(console_output(org, repo, asofdate, datalake_issues, github_issues))
+        #print(console_output(org, repo, asofdate, datalake_issues, github_issues))
 
         # add this data row to the output file
         open(reportfile, 'a').write( \
@@ -316,7 +343,7 @@ def pr_report(asofdate, reportfile, orgfilter): #-------------------------<<<
             continue
         github_prs = prs_asofdate_github(org, repo, asofdate)
         datalake_prs = prs_asofdate_datalake(org, repo, asofdate)
-        print(console_output(org, repo, asofdate, datalake_prs, github_prs))
+        #print(console_output(org, repo, asofdate, datalake_prs, github_prs))
 
         # add this data row to the output file
         open(reportfile, 'a').write( \
