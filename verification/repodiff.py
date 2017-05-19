@@ -218,9 +218,9 @@ if __name__ == '__main__':
     datalake_csv_local = 'data/repo-datalake-' + datestr + '.csv'
     github_csv = 'data/repo-github-' + datestr + '.csv'
     diff_file = 'data-verification/repodiff-' + datestr + '.csv'
-    diff_file_datalake = '/users/dmahugh/repodiff.csv'
+    diff_file_datalake = '/users/TabularSource2/repodiff.csv'
     logfile = 'data-verification/repodiff.log'
-    logfile_datalake = '/users/dmahugh/repodiff.log'
+    logfile_datalake = '/users/TabularSource2/repodiff.log'
 
     print_log(logfile,
               10*'-' + ' Data Verification for ' + datestr + ' ' + 10*'-')
