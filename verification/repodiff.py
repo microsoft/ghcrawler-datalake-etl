@@ -41,7 +41,8 @@ def github_data(*, endpoint=None, fields=None): #----------------------------<<<
     Returns a complete data set - if this endpoint does pagination, all pages
     are retrieved and aggregated.
     """
-    all_fields = github_allpages(endpoint=endpoint)
+    auth = (setting('ghinsights', 'github', 'username'), setting('ghinsights', 'github', 'pat'))
+    all_fields = github_allpages(endpoint=endpoint, auth=auth)
 
     # extract the requested fields and return them
     retval = []
