@@ -1,0 +1,70 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+DROP PROCEDURE IF EXISTS Extended.dbo.VerifyRepos;
+
+CREATE PROCEDURE Extended.dbo.VerifyRepos()
+AS
+BEGIN
+
+DECLARE @LastUtcMidnight = DateTime.UtcNow.Date;
+
+@AllOrgs =
+SELECT  OrgId,
+        Login AS OrgName
+FROM GHInsights.dbo.Org
+WHERE DeletedAt IS NULL;
+
+@AllRepos =
+SELECT  Urn AS RepoUrn,
+        RepoId,
+        Name AS RepoName,
+        OrgId,
+        OrgName,
+        CreatedAt
+FROM GHInsights.dbo.Repo
+INNER JOIN @AllOrgs ON OrganizationId == OrgId
+WHERE DeletedAt IS NULL;
+
+@CommitsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS Commits
+FROM GHInsights.dbo.Commit
+WHERE CommitCommitterDate <= @LastUtcMidnight
+GROUP BY RepoUrn;
+
+@IssuesIncludingPullRequestsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS Issues
+FROM GHInsights.dbo.Issue
+WHERE   CreatedAt <= @LastUtcMidnight
+GROUP BY RepoUrn;
+
+@PullRequestsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS PullRequests
+FROM GHInsights.dbo.PullRequest
+WHERE CreatedAt <= @LastUtcMidnight
+GROUP BY RepoUrn;
+
+@ReposData =
+SELECT  OrgName,
+        RepoName,
+        r.RepoUrn,
+        OrgId,
+        RepoId,
+        CreatedAt,
+        (Commits IS NULL ? 0 : Commits) AS Commits,
+        (Issues IS NULL ? 0 : Issues) AS Issues,
+        (PullRequests IS NULL ? 0 : PullRequests) AS PullRequests
+FROM @AllRepos AS r
+LEFT JOIN @CommitsByRepos AS c ON r.RepoUrn == c.RepoUrn
+LEFT JOIN @IssuesIncludingPullRequestsByRepos AS i ON r.RepoUrn == i.RepoUrn
+LEFT JOIN @PullRequestsByRepos AS pr ON r.RepoUrn == pr.RepoUrn;
+
+OUTPUT @ReposData
+TO "wasb://ghcrawlerverification@ospobackup/datalake-repos.csv"
+ORDER BY OrgName, RepoName
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+
+END;
