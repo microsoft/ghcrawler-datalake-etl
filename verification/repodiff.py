@@ -41,7 +41,8 @@ def github_data(*, endpoint=None, fields=None): #----------------------------<<<
     Returns a complete data set - if this endpoint does pagination, all pages
     are retrieved and aggregated.
     """
-    all_fields = github_allpages(endpoint=endpoint)
+    auth = (setting('ghinsights', 'github', 'username'), setting('ghinsights', 'github', 'pat'))
+    all_fields = github_allpages(endpoint=endpoint, auth=auth)
 
     # extract the requested fields and return them
     retval = []
@@ -217,9 +218,9 @@ if __name__ == '__main__':
     datalake_csv_local = 'data/repo-datalake-' + datestr + '.csv'
     github_csv = 'data/repo-github-' + datestr + '.csv'
     diff_file = 'data-verification/repodiff-' + datestr + '.csv'
-    diff_file_datalake = '/users/dmahugh/repodiff.csv'
+    diff_file_datalake = '/TabularSource2/repodiff.csv'
     logfile = 'data-verification/repodiff.log'
-    logfile_datalake = '/users/dmahugh/repodiff.log'
+    logfile_datalake = '/TabularSource2/repodiff.log'
 
     print_log(logfile,
               10*'-' + ' Data Verification for ' + datestr + ' ' + 10*'-')
