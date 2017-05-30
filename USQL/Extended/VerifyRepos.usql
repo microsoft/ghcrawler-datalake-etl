@@ -26,12 +26,32 @@ FROM GHInsights.dbo.Repo
 INNER JOIN @AllOrgs ON OrganizationId == OrgId
 WHERE DeletedAt IS NULL;
 
-@CommitsByRepos =
+@AllCommitsByRepos =
 SELECT  RepoUrn,
         COUNT(Urn) AS Commits
 FROM GHInsights.dbo.Commit
 WHERE CommitCommitterDate <= @LastUtcMidnight
 GROUP BY RepoUrn;
+
+@CommitsByReposOfUnmergedPullRequests =
+SELECT  RepoUrn,
+        (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits
+FROM GHInsights.dbo.PullRequest
+WHERE Merged == false
+GROUP BY RepoUrn;
+
+@BothCommitsByRepos =
+SELECT  ac.RepoUrn,
+        ac.Commits AS AllCommits,
+        (umpr.Commits IS NULL ? 0 : umpr.Commits) AS UnmergedPrsCommits
+FROM @AllCommitsByRepos AS ac
+LEFT JOIN @CommitsByReposOfUnmergedPullRequests AS umpr ON ac.RepoUrn == umpr.RepoUrn;
+
+@CommitsByRepos =
+SELECT  RepoUrn,
+        (AllCommits - UnmergedPrsCommits) AS Commits
+FROM @BothCommitsByRepos
+GROUP BY RepoUrn, AllCommits, UnmergedPrsCommits;
 
 @IssuesIncludingPullRequestsByRepos =
 SELECT  RepoUrn,

@@ -1,3 +1,5 @@
+.DS_Store
+
 # etl settings file
 ghcrawler-datalake-etl_settings.json
 *.sln
