@@ -33,6 +33,7 @@ FROM GHInsights.dbo.Commit
 WHERE CommitCommitterDate <= @LastUtcMidnight
 GROUP BY RepoUrn;
 
+// Note: the same commit may be found in different unmerged pull requests
 @CommitsByReposOfUnmergedPullRequests =
 SELECT  RepoUrn,
         (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits
