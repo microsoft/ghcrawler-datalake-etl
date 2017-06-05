@@ -26,34 +26,6 @@ FROM GHInsights.dbo.Repo
 INNER JOIN @AllOrgs ON OrganizationId == OrgId
 WHERE DeletedAt IS NULL;
 
-@AllCommitsByRepos =
-SELECT  RepoUrn,
-        COUNT(Urn) AS Commits
-FROM GHInsights.dbo.Commit
-WHERE CommitCommitterDate <= @LastUtcMidnight
-GROUP BY RepoUrn;
-
-// Note: the same commit may be found in different unmerged pull requests
-@CommitsByReposOfUnmergedPullRequests =
-SELECT  RepoUrn,
-        (SUM(Commits) IS NULL ? 0 : SUM(Commits)) AS Commits
-FROM GHInsights.dbo.PullRequest
-WHERE Merged == false
-GROUP BY RepoUrn;
-
-@BothCommitsByRepos =
-SELECT  ac.RepoUrn,
-        ac.Commits AS AllCommits,
-        (umpr.Commits IS NULL ? 0 : umpr.Commits) AS UnmergedPrsCommits
-FROM @AllCommitsByRepos AS ac
-LEFT JOIN @CommitsByReposOfUnmergedPullRequests AS umpr ON ac.RepoUrn == umpr.RepoUrn;
-
-@CommitsByRepos =
-SELECT  RepoUrn,
-        (AllCommits - UnmergedPrsCommits) AS Commits
-FROM @BothCommitsByRepos
-GROUP BY RepoUrn, AllCommits, UnmergedPrsCommits;
-
 @IssuesIncludingPullRequestsByRepos =
 SELECT  RepoUrn,
         COUNT(Urn) AS Issues
@@ -68,6 +40,13 @@ FROM GHInsights.dbo.PullRequest
 WHERE CreatedAt <= @LastUtcMidnight
 GROUP BY RepoUrn;
 
+@PullRequestCommitsByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS PullRequestCommits
+FROM GHInsights.dbo.PullRequestCommit
+WHERE CommitCommitterDate <= @LastUtcMidnight
+GROUP BY RepoUrn;
+
 @ReposData =
 SELECT  OrgName,
         RepoName,
@@ -75,13 +54,13 @@ SELECT  OrgName,
         OrgId,
         RepoId,
         CreatedAt,
-        (Commits IS NULL ? 0 : Commits) AS Commits,
         (Issues IS NULL ? 0 : Issues) AS Issues,
-        (PullRequests IS NULL ? 0 : PullRequests) AS PullRequests
+        (PullRequests IS NULL ? 0 : PullRequests) AS PullRequests,
+        (PullRequestCommits IS NULL ? 0 : PullRequestCommits) AS PullRequestCommits
 FROM @AllRepos AS r
-LEFT JOIN @CommitsByRepos AS c ON r.RepoUrn == c.RepoUrn
 LEFT JOIN @IssuesIncludingPullRequestsByRepos AS i ON r.RepoUrn == i.RepoUrn
-LEFT JOIN @PullRequestsByRepos AS pr ON r.RepoUrn == pr.RepoUrn;
+LEFT JOIN @PullRequestsByRepos AS pr ON r.RepoUrn == pr.RepoUrn
+LEFT JOIN @PullRequestCommitsByRepos AS prc ON r.RepoUrn == prc.RepoUrn;
 
 OUTPUT @ReposData
 TO "wasb://ghcrawlerverification@ospobackup/datalake-repos.csv"
