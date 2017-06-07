@@ -6,7 +6,7 @@ REFERENCE ASSEMBLY [GHInsights.USql];
 REFERENCE ASSEMBLY [Newtonsoft.Json];
 @PRCommit =
 SELECT  Urn
-        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request.href") AS PullRequestUrn
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
         ,GHInsights.USql.Utility.GetInteger(Data, "author.id") AS AuthorId
@@ -58,7 +58,7 @@ CREATE TABLE dbo.PullRequestCommit
 )
 AS
 SELECT  Urn
-        ,RepoUrn
+        ,PullRequestUrn
         ,CommitSha
         ,Url
         ,AuthorId

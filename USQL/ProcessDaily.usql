@@ -2270,7 +2270,7 @@ WHERE RowNumber == 1;
 /////////////////////////////////////////////////////////////////////////
 @PRCommit =
 SELECT  Urn
-        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request.href") AS PullRequestUrn
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
         ,GHInsights.USql.Utility.GetInteger(Data, "author.id") AS AuthorId
@@ -2318,7 +2318,7 @@ TRUNCATE TABLE dbo.PullRequestCommit;
 
 INSERT INTO dbo.PullRequestCommit
 SELECT  Urn
-        ,RepoUrn
+        ,PullRequestUrn
         ,CommitSha
         ,Url
         ,AuthorId
@@ -2358,7 +2358,7 @@ WHERE RowNumber == 1;
 /////////////////////////////////////////////////////////////////////////
 @PRCommitComment =
 SELECT  Urn
-        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.commit.href") AS CommitUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request_commit.href") AS CommitUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetString(Data, "commit_id") AS CommitSha
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS CommitCommentId
@@ -2418,81 +2418,6 @@ SELECT Urn
       ,EtlIngestDate
 FROM @PRCommitCommentDeDupe
 WHERE RowNumber == 1;
-
-/////////////////////////////////////////////////////////////////////////
-// Pull Request Commit Map
-/////////////////////////////////////////////////////////////////////////
-
-//get all
-@RawMap =
-SELECT  GHInsights.USql.Utility.GetString(Data, "_metadata.links.origin.href") AS OriginUrn
-        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.unique.href") AS UniqueUrn
-        ,Data
-        ,Urn AS EtlSourceId
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
-        ,DateTime.Parse(IngestDate, null, System.Globalization.DateTimeStyles.AssumeUniversal).ToUniversalTime() AS EtlIngestDate
-FROM Staging.GHCrawler.GitHubData AS e
-WHERE EntityName == "commits" AND Urn LIKE "%pull_request%"
-AND IngestDate == @IngestDatePartition;
-
-//find most recent unique for origin
-
-@UniqueNumberedMap =
-SELECT   UniqueUrn
-        ,ROW_NUMBER() OVER (PARTITION BY OriginUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
-FROM @RawMap;
-
-@UniqueMostRecentMap = SELECT DISTINCT UniqueUrn FROM @UniqueNumberedMap WHERE RowNumber == 1;
-
-@CollectionExplodeMap =
-SELECT  EtlIngestDate
-        ,OriginUrn AS RepoUrn
-        ,JsonPath
-        ,GHInsights.USql.Utility.GetUSqlString(Value) AS UserUrn
-        ,EtlSourceId
-        ,FetchedAt
-        ,ProcessedAt
-        ,DeletedAt
-        ,u.UniqueUrn
-FROM @UniqueMostRecentMap AS u INNER JOIN @RawMap AS e ON u.UniqueUrn == e.UniqueUrn
-CROSS APPLY EXPLODE(Data) AS d(JsonPath string, Value byte[])
-WHERE JsonPath.StartsWith("_metadata.links.resources.hrefs[");
-
-@UniqueMostRecentMapRepos =
-SELECT DISTINCT OriginUrn AS RepoUrn
-FROM @RawMap;
-
-@PullRequestCommitMap =
-SELECT  RepoUrn,
-        UserUrn,
-        FetchedAt,
-        ProcessedAt,
-        EtlIngestDate,
-        UniqueUrn
-FROM @CollectionExplodeMap
-UNION ALL
-SELECT  r.RepoUrn,
-        UserUrn,
-        FetchedAt,
-        ProcessedAt,
-        EtlIngestDate,
-        UniqueUrn
-FROM dbo.PullRequestCommitMap AS r
-LEFT JOIN @UniqueMostRecentMapRepos AS e ON e.RepoUrn == r.RepoUrn
-WHERE e.RepoUrn IS NULL;
-
-TRUNCATE TABLE dbo.PullRequestCommitMap;
-
-INSERT INTO dbo.PullRequestCommitMap
-SELECT DISTINCT RepoUrn,
-        UserUrn,
-        FetchedAt,
-        ProcessedAt,
-        EtlIngestDate,
-        UniqueUrn
-FROM @PullRequestCommitMap;
 
 /////////////////////////////////////////////////////////////////////////
 // Pull Request Review Comment

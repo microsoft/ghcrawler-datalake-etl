@@ -9,7 +9,7 @@ REFERENCE ASSEMBLY [Newtonsoft.Json];
 
 @PRCommitComment =
 SELECT  Urn
-        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.commit.href") AS CommitUrn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request_commit.href") AS CommitUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.siblings.href") AS SiblingsUrn
         ,GHInsights.USql.Utility.GetString(Data, "commit_id") AS CommitSha
         ,GHInsights.USql.Utility.GetInteger(Data, "id") AS CommitCommentId
