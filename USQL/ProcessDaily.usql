@@ -2270,6 +2270,7 @@ WHERE RowNumber == 1;
 /////////////////////////////////////////////////////////////////////////
 @PRCommit =
 SELECT  Urn
+        ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.repo.href") AS RepoUrn
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.pull_request.href") AS PullRequestUrn
         ,GHInsights.USql.Utility.GetString(Data, "sha") AS CommitSha
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
@@ -2318,6 +2319,7 @@ TRUNCATE TABLE dbo.PullRequestCommit;
 
 INSERT INTO dbo.PullRequestCommit
 SELECT  Urn
+        ,RepoUrn
         ,PullRequestUrn
         ,CommitSha
         ,Url
