@@ -20,22 +20,25 @@ ORDER BY OrgName
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: false);
 
 @GitHubRepos =
-EXTRACT RepoUrn string,
-        OrgId long?,
-        OrgName string,
-        RepoId long?,
+EXTRACT OrgName string,
         RepoName string,
+        RepoUrn string,
+        OrgId long?,
+        RepoId long?,
         CreatedAt DateTime?,
         Issues int,
         PullRequests int
 FROM "wasb://ghcrawlerverification@ospobackup/github-repos.csv"
 USING Extractors.Csv(skipFirstNRows:1);
 
-// TODO: Uncomment
-// @GitHubRandomCommits =
-// EXTRACT Urn string
-// FROM "wasb://ghcrawlerverification@ospobackup/github-random-commits.csv"
-// USING Extractors.Csv();
+@GitHubRandomCommits =
+EXTRACT OrgName string,
+        RepoName string,
+        OrgId long?,
+        RepoId long?,
+        Sha string
+FROM "wasb://ghcrawlerverification@ospobackup/github-random-commits.csv"
+USING Extractors.Csv(skipFirstNRows:1);
 
 @Orgs =
 SELECT  DISTINCT OrgId, OrgName
@@ -53,22 +56,22 @@ JOIN @Orgs ON OrganizationId == OrgId
 WHERE DeletedAt IS NULL;
 
 @ExtraReposInDataLake =
-SELECT  RepoUrn,
-        OrgId,
-        OrgName,
-        RepoId,
+SELECT  OrgName,
         RepoName,
+        RepoUrn,
+        OrgId,
+        RepoId,
         CreatedAt,
         "Extra" AS ExtraOrMissing
 FROM @GitHubRepos AS ghr
 RIGHT ANTISEMIJOIN @DataLakeReposForInputOrgs AS dlr ON ghr.RepoUrn == dlr.RepoUrn;
 
 @MissingReposInDataLake =
-SELECT  RepoUrn,
-        OrgId,
-        OrgName,
-        RepoId,
+SELECT  OrgName,
         RepoName,
+        RepoUrn,
+        OrgId,
+        RepoId,
         CreatedAt,
         "Missing" AS ExtraOrMissing
 FROM @GitHubRepos AS ghr
@@ -86,49 +89,74 @@ TO "wasb://ghcrawlerverification@ospobackup/repos-diff.csv"
 ORDER BY OrgName, RepoName
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
-// @MissingRepos =
-// SELECT * // TODO: + 'missing'
-// FROM @GitHubRepos AS ghr
-// LEFT ANTISEMIJOIN @DataLakeReposForInputOrgs AS ar ON ar.RepoUrn == ghr.RepoUrn;
+@IssuesIncludingPullRequestsByReposForInputOrgs =
+SELECT  i.RepoUrn,
+        COUNT(Urn) AS Issues
+FROM GHInsights.dbo.Issue AS i
+INNER JOIN @DataLakeReposForInputOrgs AS r ON i.RepoUrn == r.RepoUrn
+WHERE i.CreatedAt <= @LastUtcMidnight
+GROUP BY i.RepoUrn;
 
+@IssuesDiff =
+SELECT  OrgName,
+        RepoName,
+        ghr.RepoUrn,
+        OrgId,
+        RepoId,
+        CreatedAt,
+        ghr.Issues AS GitHubIssues,
+        i.Issues AS DataLakeIssues
+FROM @GitHubRepos AS ghr
+INNER JOIN @IssuesIncludingPullRequestsByReposForInputOrgs AS i ON ghr.RepoUrn == i.RepoUrn
+WHERE ghr.Issues != i.Issues;
 
+OUTPUT @IssuesDiff
+TO "wasb://ghcrawlerverification@ospobackup/issues-diff.csv"
+ORDER BY OrgName, RepoName
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
+@PullRequestsByReposForInputOrgs =
+SELECT  pr.RepoUrn,
+        COUNT(Urn) AS PullRequests
+FROM GHInsights.dbo.PullRequest AS pr
+INNER JOIN @DataLakeReposForInputOrgs AS r ON pr.RepoUrn == r.RepoUrn
+WHERE pr.CreatedAt <= @LastUtcMidnight
+GROUP BY pr.RepoUrn;
 
-// @IssuesIncludingPullRequestsByReposForInputOrgs =
-// SELECT  i.RepoUrn,
-//         COUNT(Urn) AS Issues
-// FROM GHInsights.dbo.Issue AS i
-// INNER JOIN @Repos AS r ON i.RepoUrn == r.RepoUrn
-// WHERE i.CreatedAt <= @LastUtcMidnight
-// GROUP BY i.RepoUrn;
+@PullRequestsDiff =
+SELECT  OrgName,
+        RepoName,
+        ghr.RepoUrn,
+        OrgId,
+        RepoId,
+        CreatedAt,
+        ghr.PullRequests AS GitHubPullRequests,
+        pr.PullRequests AS DataLakePullRequests
+FROM @GitHubRepos AS ghr
+INNER JOIN @PullRequestsByReposForInputOrgs AS pr ON ghr.RepoUrn == pr.RepoUrn
+WHERE ghr.PullRequests != pr.PullRequests;
 
-// @PullRequestsByReposForInputOrgs =
-// SELECT  pr.RepoUrn,
-//         COUNT(Urn) AS PullRequests
-// FROM GHInsights.dbo.PullRequest AS pr
-// INNER JOIN @Repos AS r ON pr.RepoUrn == r.RepoUrn
-// WHERE pr.CreatedAt <= @LastUtcMidnight
-// GROUP BY pr.RepoUrn;
+OUTPUT @PullRequestsDiff
+TO "wasb://ghcrawlerverification@ospobackup/pullrequests-diff.csv"
+ORDER BY OrgName, RepoName
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
+@AllCommits =
+SELECT CommitSha
+FROM GHInsights.dbo.Commit;
 
+@MissingCommitsInDataLake =
+SELECT  OrgName,
+        RepoName,
+        OrgId,
+        RepoId,
+        Sha
+FROM @GitHubRandomCommits
+LEFT ANTISEMIJOIN @AllCommits ON Sha == CommitSha;
 
-
-// @ReposData =
-// SELECT  OrgName,
-//         RepoName,
-//         r.RepoUrn,
-//         OrgId,
-//         RepoId,
-//         CreatedAt,
-//         (Issues IS NULL ? 0 : Issues) AS Issues,s
-//         (PullRequests IS NULL ? 0 : PullRequests) AS PullRequests
-// FROM @Repos AS r
-// LEFT JOIN @IssuesIncludingPullRequestsByRepos AS i ON r.RepoUrn == i.RepoUrn
-// LEFT JOIN @PullRequestsByRepos AS pr ON r.RepoUrn == pr.RepoUrn;
-
-// OUTPUT @ReposData
-// TO "wasb://ghcrawlerverification@ospobackup/datalake-repos.csv"
-// ORDER BY OrgName, RepoName
-// USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+OUTPUT @MissingCommitsInDataLake
+TO "wasb://ghcrawlerverification@ospobackup/missing-commits.csv"
+ORDER BY OrgName, RepoName, Sha
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: false);
 
 // END;
