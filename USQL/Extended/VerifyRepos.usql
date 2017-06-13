@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-// DROP PROCEDURE IF EXISTS Extended.dbo.VerifyRepos;
+DROP PROCEDURE IF EXISTS Extended.dbo.VerifyRepos;
 
-// CREATE PROCEDURE Extended.dbo.VerifyRepos()
-// AS
-// BEGIN
+CREATE PROCEDURE Extended.dbo.VerifyRepos()
+AS
+BEGIN
 
 DECLARE @LastUtcMidnight = DateTime.UtcNow.Date;
 
@@ -161,4 +161,4 @@ TO "wasb://ghcrawlerverification@ospobackup/missing-commits.csv"
 ORDER BY OrgName, RepoName, Sha
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: false);
 
-// END;
+END;
