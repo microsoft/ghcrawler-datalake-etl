@@ -34,6 +34,24 @@ WHERE   PullRequestUrl IS NULL
         AND State == "open"
 GROUP BY RepoUrn;
 
+@AssignedOpenIssuesByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS AssignedOpenIssues
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND State == "open"
+        AND AssigneeId IS NOT NULL
+GROUP BY RepoUrn;
+
+@UnassignedOpenIssuesByRepos =
+SELECT  RepoUrn,
+        COUNT(Urn) AS UnassignedOpenIssues
+FROM GHInsights.dbo.Issue
+WHERE   PullRequestUrl IS NULL
+        AND State == "open"
+        AND AssigneeId IS NULL
+GROUP BY RepoUrn;
+
 @AllClosedIssuesByRepos =
 SELECT  RepoUrn,
         COUNT(Urn) AS ClosedIssues,
@@ -187,6 +205,8 @@ SELECT  RepoId,
         (CommitsToday IS NULL ? 0 : CommitsToday) AS CommitsToday,
         (LinesCommittedToday IS NULL ? 0 : LinesCommittedToday) AS LinesCommittedToday,
         (OpenIssues IS NULL ? 0 : OpenIssues) AS OpenIssues,
+        (AssignedOpenIssues IS NULL ? 0 : AssignedOpenIssues) AS AssignedOpenIssues,
+        (UnassignedOpenIssues IS NULL ? 0 : UnassignedOpenIssues) AS UnassignedOpenIssues,
         (ClosedIssues IS NULL ? 0 : ClosedIssues) AS ClosedIssues,
         (OpenedIssuesToday IS NULL ? 0 : OpenedIssuesToday) AS OpenedIssuesToday,
         (ClosedIssuesToday IS NULL ? 0 : ClosedIssuesToday) AS ClosedIssuesToday,
@@ -204,6 +224,8 @@ FROM @AllRepos AS r
 LEFT JOIN @AllCommitsByRepos AS ac ON r.RepoUrn == ac.RepoUrn
 LEFT JOIN @CommitsTodayByRepos AS ct ON r.RepoUrn == ct.RepoUrn
 LEFT JOIN @AllOpenIssuesByRepos AS aoi ON r.RepoUrn == aoi.RepoUrn
+LEFT JOIN @AssignedOpenIssuesByRepos AS asoi ON r.RepoUrn == asoi.RepoUrn
+LEFT JOIN @UnassignedOpenIssuesByRepos AS unoi ON r.RepoUrn == unoi.RepoUrn
 LEFT JOIN @AllClosedIssuesByRepos AS aci ON r.RepoUrn == aci.RepoUrn
 LEFT JOIN @IssuesOpenedTodayByRepos AS iot ON r.RepoUrn == iot.RepoUrn
 LEFT JOIN @IssuesClosedTodayByRepos AS ict ON r.RepoUrn == ict.RepoUrn
@@ -231,6 +253,8 @@ SELECT  OrgId,
         (SUM(CommitsToday) IS NULL ? 0 : SUM(CommitsToday)) AS CommitsToday,
         (SUM(LinesCommittedToday) IS NULL ? 0 : SUM(LinesCommittedToday)) AS LinesCommittedToday,
         (SUM(OpenIssues) IS NULL ? 0 : SUM(OpenIssues)) AS OpenIssues,
+        (SUM(AssignedOpenIssues) IS NULL ? 0 : SUM(AssignedOpenIssues)) AS AssignedOpenIssues,
+        (SUM(UnassignedOpenIssues) IS NULL ? 0 : SUM(UnassignedOpenIssues)) AS UnassignedOpenIssues,
         (SUM(ClosedIssues) IS NULL ? 0 : SUM(ClosedIssues)) AS ClosedIssues,
         (SUM(OpenedIssuesToday) IS NULL ? 0 : SUM(OpenedIssuesToday)) AS OpenedIssuesToday,
         (SUM(ClosedIssuesToday) IS NULL ? 0 : SUM(ClosedIssuesToday)) AS ClosedIssuesToday,
@@ -260,6 +284,8 @@ SELECT  SUM(Subscribers) AS Subscribers,
         SUM(CommitsToday) AS CommitsToday,
         SUM(LinesCommittedToday) AS LinesCommittedToday,
         SUM(OpenIssues) AS OpenIssues,
+        SUM(AssignedOpenIssues) AS AssignedOpenIssues,
+        SUM(UnassignedOpenIssues) AS UnassignedOpenIssues,
         SUM(ClosedIssues) AS ClosedIssues,
         SUM(OpenedIssuesToday) AS OpenedIssuesToday,
         SUM(ClosedIssuesToday) AS ClosedIssuesToday,
