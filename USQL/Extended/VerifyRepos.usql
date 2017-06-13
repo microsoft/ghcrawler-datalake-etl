@@ -36,7 +36,8 @@ EXTRACT OrgName string,
         RepoName string,
         OrgId long?,
         RepoId long?,
-        Sha string
+        Sha string,
+        CommitterDate DateTime
 FROM "wasb://ghcrawlerverification@ospobackup/github-random-commits.csv"
 USING Extractors.Csv(skipFirstNRows:1);
 
@@ -150,7 +151,8 @@ SELECT  OrgName,
         RepoName,
         OrgId,
         RepoId,
-        Sha
+        Sha,
+        CommitterDate
 FROM @GitHubRandomCommits
 LEFT ANTISEMIJOIN @AllCommits ON Sha == CommitSha;
 
