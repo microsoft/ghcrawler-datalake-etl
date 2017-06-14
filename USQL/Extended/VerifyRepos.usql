@@ -7,8 +7,6 @@ CREATE PROCEDURE Extended.dbo.VerifyRepos()
 AS
 BEGIN
 
-DECLARE @LastUtcMidnight = DateTime.UtcNow.Date;
-
 @AllDataLakeOrgs =
 SELECT Login AS OrgName
 FROM GHInsights.dbo.Org
@@ -18,6 +16,11 @@ OUTPUT @AllDataLakeOrgs
 TO "wasb://ghcrawlerverification@ospobackup/orgs.csv"
 ORDER BY OrgName
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: false);
+
+@CutoffTime =
+EXTRACT Cutoff DateTime
+FROM "wasb://ghcrawlerverification@ospobackup/cutoff-time.csv"
+USING Extractors.Csv();
 
 @GitHubRepos =
 EXTRACT OrgName string,
@@ -54,7 +57,9 @@ SELECT  Urn AS RepoUrn,
         CreatedAt
 FROM GHInsights.dbo.Repo
 JOIN @Orgs ON OrganizationId == OrgId
-WHERE DeletedAt IS NULL;
+CROSS JOIN @CutoffTime
+WHERE DeletedAt IS NULL
+AND CreatedAt <= Cutoff;
 
 @ExtraReposInDataLake =
 SELECT  OrgName,
@@ -95,7 +100,8 @@ SELECT  i.RepoUrn,
         COUNT(Urn) AS Issues
 FROM GHInsights.dbo.Issue AS i
 INNER JOIN @DataLakeReposForInputOrgs AS r ON i.RepoUrn == r.RepoUrn
-WHERE i.CreatedAt <= @LastUtcMidnight
+CROSS JOIN @CutoffTime
+WHERE i.CreatedAt <= Cutoff
 GROUP BY i.RepoUrn;
 
 @IssuesDiff =
@@ -121,7 +127,8 @@ SELECT  pr.RepoUrn,
         COUNT(Urn) AS PullRequests
 FROM GHInsights.dbo.PullRequest AS pr
 INNER JOIN @DataLakeReposForInputOrgs AS r ON pr.RepoUrn == r.RepoUrn
-WHERE pr.CreatedAt <= @LastUtcMidnight
+CROSS JOIN @CutoffTime
+WHERE pr.CreatedAt <= Cutoff
 GROUP BY pr.RepoUrn;
 
 @PullRequestsDiff =
@@ -159,6 +166,6 @@ LEFT ANTISEMIJOIN @AllCommits ON Sha == CommitSha;
 OUTPUT @MissingCommitsInDataLake
 TO "wasb://ghcrawlerverification@ospobackup/missing-commits.csv"
 ORDER BY OrgName, RepoName, Sha
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: false);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 END;
