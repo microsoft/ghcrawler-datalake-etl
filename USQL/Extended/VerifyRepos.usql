@@ -15,7 +15,7 @@ WHERE DeletedAt IS NULL;
 OUTPUT @AllDataLakeOrgs
 TO "wasb://ghcrawlerverification@ospobackup/orgs.csv"
 ORDER BY OrgName
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: false);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: false, outputHeader: false);
 
 @CutoffTime =
 EXTRACT Cutoff DateTime
@@ -93,7 +93,7 @@ FROM @MissingReposInDataLake;
 OUTPUT @ReposDiff
 TO "wasb://ghcrawlerverification@ospobackup/repos-diff.csv"
 ORDER BY OrgName, RepoName
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: false, outputHeader: true);
 
 @IssuesIncludingPullRequestsByReposForInputOrgs =
 SELECT  i.RepoUrn,
@@ -120,7 +120,7 @@ WHERE ghr.Issues != i.Issues;
 OUTPUT @IssuesDiff
 TO "wasb://ghcrawlerverification@ospobackup/issues-diff.csv"
 ORDER BY OrgName, RepoName
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: false, outputHeader: true);
 
 @PullRequestsByReposForInputOrgs =
 SELECT  pr.RepoUrn,
@@ -147,7 +147,7 @@ WHERE ghr.PullRequests != pr.PullRequests;
 OUTPUT @PullRequestsDiff
 TO "wasb://ghcrawlerverification@ospobackup/pullrequests-diff.csv"
 ORDER BY OrgName, RepoName
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: false, outputHeader: true);
 
 @AllCommits =
 SELECT CommitSha
@@ -166,6 +166,6 @@ LEFT ANTISEMIJOIN @AllCommits ON Sha == CommitSha;
 OUTPUT @MissingCommitsInDataLake
 TO "wasb://ghcrawlerverification@ospobackup/missing-commits.csv"
 ORDER BY OrgName, RepoName, Sha
-USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
+USING Outputters.Csv(escapeCharacter: '\\', quoting: false, outputHeader: true);
 
 END;
