@@ -60,7 +60,7 @@ WHERE EntityName == "issue";
 
 @IssueDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @Issue;
 
 DROP TABLE IF EXISTS dbo.Issue;

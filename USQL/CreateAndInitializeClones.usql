@@ -71,7 +71,7 @@ FROM @ClonesPrePivot;
 // FROM GHInsights.dbo.Clones;
 
 @ClonesDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @ClonesPivoted;
 
 

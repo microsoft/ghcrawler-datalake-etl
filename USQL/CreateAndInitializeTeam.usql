@@ -30,7 +30,7 @@ WHERE EntityName == "team";
 
 @TeamDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @Team;
 
 DROP TABLE IF EXISTS dbo.Team;

@@ -119,12 +119,12 @@ WHERE EntityName == "repo";
 
 @RepoDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @Repo;
 
 @RepoLogDeDupe =
 SELECT *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId, UpdatedAt ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId, UpdatedAt ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @Repo;
 
 DROP TABLE IF EXISTS dbo.Repo;

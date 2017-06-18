@@ -144,7 +144,7 @@ WHERE EntityName LIKE "%Event";
 
 @EventDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @Event;
 
 DROP TABLE IF EXISTS dbo.Event;

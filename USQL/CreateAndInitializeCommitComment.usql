@@ -35,7 +35,7 @@ WHERE EntityName == "commit_comment";
 
 @CommitCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @CommitComment;
 
 DROP TABLE IF EXISTS dbo.CommitComment;

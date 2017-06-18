@@ -35,7 +35,7 @@ WHERE EntityName == "pull_request_commit_comment";
 
 @PRCommitCommentDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EtlSourceId ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @PRCommitComment;
 
 DROP TABLE IF EXISTS dbo.PullRequestCommitComment;

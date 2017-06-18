@@ -19,7 +19,7 @@ WHERE EntityName == "PushEvent";
 
 @EventCommitDeDupe =
 SELECT   *
-        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY DeletedAt, ProcessedAt DESC) AS RowNumber
+        ,ROW_NUMBER() OVER (PARTITION BY EventUrn ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
 FROM @RawEventCommit;
 
 @EventPayloadCommitExplode =
