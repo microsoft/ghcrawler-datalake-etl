@@ -284,24 +284,6 @@ USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 // ***** Group by Orgs ***** //
 
-@AllContributorsByOrgs =
-SELECT  OrganizationId,
-        COUNT(DISTINCT AuthorLogin) AS Contributors
-FROM @CommitsContributorsByRepos
-GROUP BY OrganizationId;
-
-@AllMicrosoftContributorsByOrgs =
-SELECT  OrganizationId,
-        COUNT(DISTINCT AuthorLogin) AS MicrosoftContributors
-FROM @MicrosoftContributorsByRepos
-GROUP BY OrganizationId;
-
-@AllCommunityContributorsByOrgs =
-SELECT  OrganizationId,
-        COUNT(DISTINCT AuthorLogin) AS CommunityContributors
-FROM @CommunityContributorsByRepos
-GROUP BY OrganizationId;
-
 @OrgsMetricsData =
 SELECT  OrgId,
         OrgName,
@@ -325,36 +307,18 @@ SELECT  OrgId,
         (SUM(PullRequestsOpenedToday) IS NULL ? 0 : SUM(PullRequestsOpenedToday)) AS PullRequestsOpenedToday,
         (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday,
         AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
-        (acbo.Contributors IS NULL ? 0 : acbo.Contributors) AS Contributors,
-        (amcbo.MicrosoftContributors IS NULL ? 0 : amcbo.MicrosoftContributors) AS MicrosoftContributors,
-        (accbo.CommunityContributors IS NULL ? 0 : accbo.CommunityContributors) AS CommunityContributors
+        (SUM(Contributors) IS NULL ? 0 : SUM(Contributors)) AS Contributors, // TODO: summarize distinct contributors
+        (SUM(MicrosoftContributors) IS NULL ? 0 : SUM(MicrosoftContributors)) AS MicrosoftContributors,
+        (SUM(CommunityContributors) IS NULL ? 0 : SUM(CommunityContributors)) AS CommunityContributors
 FROM @RepoMetricsData
-LEFT JOIN @AllContributorsByOrgs AS acbo ON acbo.OrganizationId == OrgId
-LEFT JOIN @AllMicrosoftContributorsByOrgs AS amcbo ON amcbo.OrganizationId == OrgId
-LEFT JOIN @AllCommunityContributorsByOrgs AS accbo ON accbo.OrganizationId == OrgId
 GROUP BY OrgId,
-         OrgName,
-         acbo.Contributors,
-         amcbo.MicrosoftContributors,
-         accbo.CommunityContributors;
+         OrgName;
 
 OUTPUT @OrgsMetricsData
 TO "wasb://metrics@ospobackup/orgs.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 // ***** All ***** //
-
-@AllContributors =
-SELECT COUNT(DISTINCT AuthorLogin) AS Contributors
-FROM @CommitsContributorsByRepos;
-
-@AllMicrosoftContributors =
-SELECT COUNT(DISTINCT AuthorLogin) AS MicrosoftContributors
-FROM @MicrosoftContributorsByRepos;
-
-@AllCommunityContributors =
-SELECT COUNT(DISTINCT AuthorLogin) AS CommunityContributors
-FROM @CommunityContributorsByRepos;
 
 @AllMetricsData =
 SELECT  SUM(Subscribers) AS Subscribers,
@@ -377,16 +341,10 @@ SELECT  SUM(Subscribers) AS Subscribers,
         SUM(PullRequestsOpenedToday) AS PullRequestsOpenedToday,
         SUM(PullRequestsClosedToday) AS PullRequestsClosedToday,
         AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
-        (ac.Contributors IS NULL ? 0 : ac.Contributors) AS Contributors,
-        (amc.MicrosoftContributors IS NULL ? 0 : amc.MicrosoftContributors) AS MicrosoftContributors,
-        (acc.CommunityContributors IS NULL ? 0 : acc.CommunityContributors) AS CommunityContributors
-FROM @OrgsMetricsData
-CROSS JOIN @AllContributors AS ac
-CROSS JOIN @AllMicrosoftContributors AS amc
-CROSS JOIN @AllCommunityContributors AS acc
-GROUP BY ac.Contributors,
-         amc.MicrosoftContributors,
-         acc.CommunityContributors;
+        SUM(Contributors) AS Contributors, // TODO: summarize distinct contributors
+        SUM(MicrosoftContributors) AS MicrosoftContributors,
+        SUM(CommunityContributors) AS CommunityContributors
+FROM @OrgsMetricsData;
 
 OUTPUT @AllMetricsData
 TO "wasb://metrics@ospobackup/all.csv"
