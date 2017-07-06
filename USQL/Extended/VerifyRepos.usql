@@ -29,6 +29,7 @@ EXTRACT OrgName string,
         OrgId long?,
         RepoId long?,
         CreatedAt DateTime?,
+        UpdatedAt DateTime?,
         Issues int,
         PullRequests int
 FROM "wasb://ghcrawlerverification@ospobackup/github-repos.csv"
