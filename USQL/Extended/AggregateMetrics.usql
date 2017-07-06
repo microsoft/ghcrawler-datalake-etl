@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-// DROP PROCEDURE IF EXISTS Extended.dbo.AggregateMetrics;
+DROP PROCEDURE IF EXISTS Extended.dbo.AggregateMetrics;
 
-// CREATE PROCEDURE Extended.dbo.AggregateMetrics()
-// AS
-// BEGIN
+CREATE PROCEDURE Extended.dbo.AggregateMetrics()
+AS
+BEGIN
 
 // ***** Group by Repos ***** //
 
@@ -171,33 +171,47 @@ FROM @PullRequestsFirstResponse
 WHERE DaysToFirstResponse != 0
 GROUP BY RepoUrn;
 
+@CommitsContributorsByRepos =
+SELECT DISTINCT OrganizationId,
+                RepoUrn,
+                AuthorLogin
+FROM GHInsights.dbo.Commit
+INNER JOIN GHInsights.dbo.Repo AS repo ON repo.Urn == RepoUrn
+WHERE AuthorLogin IS NOT NULL
+AND   repo.DeletedAt IS NULL;
+
 @AllContributorsByRepos =
 SELECT  RepoUrn,
-        COUNT(UserUrn) AS Contributors
-FROM GHInsights.dbo.RepoContributors
+        COUNT(AuthorLogin) AS Contributors
+FROM @CommitsContributorsByRepos
 GROUP BY RepoUrn;
+
+@MicrosoftContributorsByRepos =
+SELECT  cc.OrganizationId,
+        cc.RepoUrn,
+        cc.AuthorLogin
+FROM @CommitsContributorsByRepos AS cc
+INNER JOIN Extended.dbo.GitHubEmployeeLink AS ghel ON ghel.GitHubUserName == cc.AuthorLogin;
 
 @AllMicrosoftContributorsByRepos =
 SELECT  RepoUrn,
-        COUNT(rc.UserUrn) AS MicrosoftContributors
-FROM GHInsights.dbo.RepoContributors AS rc
-INNER JOIN GHInsights.dbo.User AS u ON u.Urn == rc.UserUrn
-LEFT JOIN Extended.dbo.GitHubEmployeeLink AS ghel ON ghel.GitHubUserName == u.Login
+        COUNT(AuthorLogin) AS MicrosoftContributors
+FROM @MicrosoftContributorsByRepos
 GROUP BY RepoUrn;
 
-// @AllCommunityContributorsByRepos =
-// SELECT  RepoUrn,
-//         COUNT(rc.UserUrn) AS CommunityContributors
-// FROM GHInsights.dbo.RepoContributors AS rc
-// INNER JOIN GHInsights.dbo.User AS u ON u.Urn == rc.UserUrn
-// RIGHT ANTISEMIJOIN Extended.dbo.GitHubEmployeeLink AS ghel ON ghel.GitHubUserName == u.Login
-// GROUP BY RepoUrn;
+@CommunityContributorsByRepos =
+SELECT  cc.OrganizationId,
+        cc.RepoUrn,
+        cc.AuthorLogin
+FROM @CommitsContributorsByRepos AS cc
+LEFT JOIN Extended.dbo.GitHubEmployeeLink AS ghel ON ghel.GitHubUserName == cc.AuthorLogin
+WHERE ghel.GitHubUserName IS NULL;
 
 @AllCommunityContributorsByRepos =
-SELECT  acon.RepoUrn,
-        Contributors - (MicrosoftContributors IS NULL ? 0 : MicrosoftContributors) AS CommunityContributors
-FROM @AllContributorsByRepos AS acon
-LEFT JOIN @AllMicrosoftContributorsByRepos AS mscon ON mscon.RepoUrn == acon.RepoUrn;
+SELECT  RepoUrn,
+        COUNT(AuthorLogin) AS CommunityContributors
+FROM @CommunityContributorsByRepos
+GROUP BY RepoUrn;
 
 @AllOrgs =
 SELECT  OrgId,
@@ -270,6 +284,24 @@ USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 // ***** Group by Orgs ***** //
 
+@AllContributorsByOrgs =
+SELECT  OrganizationId,
+        COUNT(DISTINCT AuthorLogin) AS Contributors
+FROM @CommitsContributorsByRepos
+GROUP BY OrganizationId;
+
+@AllMicrosoftContributorsByOrgs =
+SELECT  OrganizationId,
+        COUNT(DISTINCT AuthorLogin) AS MicrosoftContributors
+FROM @MicrosoftContributorsByRepos
+GROUP BY OrganizationId;
+
+@AllCommunityContributorsByOrgs =
+SELECT  OrganizationId,
+        COUNT(DISTINCT AuthorLogin) AS CommunityContributors
+FROM @CommunityContributorsByRepos
+GROUP BY OrganizationId;
+
 @OrgsMetricsData =
 SELECT  OrgId,
         OrgName,
@@ -293,17 +325,36 @@ SELECT  OrgId,
         (SUM(PullRequestsOpenedToday) IS NULL ? 0 : SUM(PullRequestsOpenedToday)) AS PullRequestsOpenedToday,
         (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday,
         AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
-        (SUM(Contributors) IS NULL ? 0 : SUM(Contributors)) AS Contributors,
-        (SUM(MicrosoftContributors) IS NULL ? 0 : SUM(MicrosoftContributors)) AS MicrosoftContributors,
-        (SUM(CommunityContributors) IS NULL ? 0 : SUM(CommunityContributors)) AS CommunityContributors
+        (acbo.Contributors IS NULL ? 0 : acbo.Contributors) AS Contributors,
+        (amcbo.MicrosoftContributors IS NULL ? 0 : amcbo.MicrosoftContributors) AS MicrosoftContributors,
+        (accbo.CommunityContributors IS NULL ? 0 : accbo.CommunityContributors) AS CommunityContributors
 FROM @RepoMetricsData
-GROUP BY OrgId, OrgName;
+LEFT JOIN @AllContributorsByOrgs AS acbo ON acbo.OrganizationId == OrgId
+LEFT JOIN @AllMicrosoftContributorsByOrgs AS amcbo ON amcbo.OrganizationId == OrgId
+LEFT JOIN @AllCommunityContributorsByOrgs AS accbo ON accbo.OrganizationId == OrgId
+GROUP BY OrgId,
+         OrgName,
+         acbo.Contributors,
+         amcbo.MicrosoftContributors,
+         accbo.CommunityContributors;
 
 OUTPUT @OrgsMetricsData
 TO "wasb://metrics@ospobackup/orgs.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
 // ***** All ***** //
+
+@AllContributors =
+SELECT COUNT(DISTINCT AuthorLogin) AS Contributors
+FROM @CommitsContributorsByRepos;
+
+@AllMicrosoftContributors =
+SELECT COUNT(DISTINCT AuthorLogin) AS MicrosoftContributors
+FROM @MicrosoftContributorsByRepos;
+
+@AllCommunityContributors =
+SELECT COUNT(DISTINCT AuthorLogin) AS CommunityContributors
+FROM @CommunityContributorsByRepos;
 
 @AllMetricsData =
 SELECT  SUM(Subscribers) AS Subscribers,
@@ -326,13 +377,19 @@ SELECT  SUM(Subscribers) AS Subscribers,
         SUM(PullRequestsOpenedToday) AS PullRequestsOpenedToday,
         SUM(PullRequestsClosedToday) AS PullRequestsClosedToday,
         AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
-        SUM(Contributors) AS Contributors,
-        SUM(MicrosoftContributors) AS MicrosoftContributors,
-        SUM(CommunityContributors) AS CommunityContributors
-FROM @OrgsMetricsData;
+        (ac.Contributors IS NULL ? 0 : ac.Contributors) AS Contributors,
+        (amc.MicrosoftContributors IS NULL ? 0 : amc.MicrosoftContributors) AS MicrosoftContributors,
+        (acc.CommunityContributors IS NULL ? 0 : acc.CommunityContributors) AS CommunityContributors
+FROM @OrgsMetricsData
+CROSS JOIN @AllContributors AS ac
+CROSS JOIN @AllMicrosoftContributors AS amc
+CROSS JOIN @AllCommunityContributors AS acc
+GROUP BY ac.Contributors,
+         amc.MicrosoftContributors,
+         acc.CommunityContributors;
 
 OUTPUT @AllMetricsData
 TO "wasb://metrics@ospobackup/all.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
-// END;
+END;
