@@ -186,17 +186,17 @@ SELECT  RepoUrn,
 FROM @CommitsContributorsByRepos
 GROUP BY RepoUrn;
 
-@MicrosoftContributorsByRepos =
+@CompanyContributorsByRepos =
 SELECT  cc.OrganizationId,
         cc.RepoUrn,
         cc.AuthorLogin
 FROM @CommitsContributorsByRepos AS cc
 INNER JOIN Extended.dbo.GitHubEmployeeLink AS ghel ON ghel.GitHubUserName == cc.AuthorLogin;
 
-@AllMicrosoftContributorsByRepos =
+@AllCompanyContributorsByRepos =
 SELECT  RepoUrn,
-        COUNT(AuthorLogin) AS MicrosoftContributors
-FROM @MicrosoftContributorsByRepos
+        COUNT(AuthorLogin) AS CompanyContributors
+FROM @CompanyContributorsByRepos
 GROUP BY RepoUrn;
 
 @CommunityContributorsByRepos =
@@ -256,7 +256,7 @@ SELECT  RepoId,
         (PullRequestsClosedToday IS NULL ? 0 : PullRequestsClosedToday) AS PullRequestsClosedToday,
         AvgDaysForFirstResponseToPullRequests,
         (Contributors IS NULL ? 0 : Contributors) AS Contributors,
-        (MicrosoftContributors IS NULL ? 0 : MicrosoftContributors) AS MicrosoftContributors,
+        (CompanyContributors IS NULL ? 0 : CompanyContributors) AS CompanyContributors,
         (CommunityContributors IS NULL ? 0 : CommunityContributors) AS CommunityContributors
 FROM @AllRepos AS r
 LEFT JOIN @AllCommitsByRepos AS ac ON r.RepoUrn == ac.RepoUrn
@@ -275,7 +275,7 @@ LEFT JOIN @PullRequestsOpenedTodayByRepos AS prot ON r.RepoUrn == prot.RepoUrn
 LEFT JOIN @PullRequestsClosedTodayByRepos AS prct ON r.RepoUrn == prct.RepoUrn
 LEFT JOIN @PullRequestsAvgFirstResponseByRepos AS prafr ON r.RepoUrn == prafr.RepoUrn
 LEFT JOIN @AllContributorsByRepos AS acon ON r.RepoUrn == acon.RepoUrn
-LEFT JOIN @AllMicrosoftContributorsByRepos AS mscon ON r.RepoUrn == mscon.RepoUrn
+LEFT JOIN @AllCompanyContributorsByRepos AS mscon ON r.RepoUrn == mscon.RepoUrn
 LEFT JOIN @AllCommunityContributorsByRepos AS commcon ON r.RepoUrn == commcon.RepoUrn;
 
 OUTPUT @RepoMetricsData
@@ -308,7 +308,7 @@ SELECT  OrgId,
         (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday,
         AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
         (SUM(Contributors) IS NULL ? 0 : SUM(Contributors)) AS Contributors, // TODO: summarize distinct contributors
-        (SUM(MicrosoftContributors) IS NULL ? 0 : SUM(MicrosoftContributors)) AS MicrosoftContributors,
+        (SUM(CompanyContributors) IS NULL ? 0 : SUM(CompanyContributors)) AS CompanyContributors,
         (SUM(CommunityContributors) IS NULL ? 0 : SUM(CommunityContributors)) AS CommunityContributors
 FROM @RepoMetricsData
 GROUP BY OrgId,
@@ -342,7 +342,7 @@ SELECT  SUM(Subscribers) AS Subscribers,
         SUM(PullRequestsClosedToday) AS PullRequestsClosedToday,
         AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
         SUM(Contributors) AS Contributors, // TODO: summarize distinct contributors
-        SUM(MicrosoftContributors) AS MicrosoftContributors,
+        SUM(CompanyContributors) AS CompanyContributors,
         SUM(CommunityContributors) AS CommunityContributors
 FROM @OrgsMetricsData;
 
