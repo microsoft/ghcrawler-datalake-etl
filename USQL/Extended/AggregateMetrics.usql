@@ -306,15 +306,61 @@ SELECT  OrgId,
         AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
         (SUM(PullRequestsOpenedToday) IS NULL ? 0 : SUM(PullRequestsOpenedToday)) AS PullRequestsOpenedToday,
         (SUM(PullRequestsClosedToday) IS NULL ? 0 : SUM(PullRequestsClosedToday)) AS PullRequestsClosedToday,
-        AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
-        (SUM(Contributors) IS NULL ? 0 : SUM(Contributors)) AS Contributors, // TODO: summarize distinct contributors
-        (SUM(CompanyContributors) IS NULL ? 0 : SUM(CompanyContributors)) AS CompanyContributors,
-        (SUM(CommunityContributors) IS NULL ? 0 : SUM(CommunityContributors)) AS CommunityContributors
+        AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests
 FROM @RepoMetricsData
 GROUP BY OrgId,
          OrgName;
 
-OUTPUT @OrgsMetricsData
+@AllContributorsByOrgs =
+SELECT  OrganizationId,
+        COUNT(DISTINCT AuthorLogin) AS Contributors
+FROM @CommitsContributorsByRepos
+GROUP BY OrganizationId;
+
+@AllCompanyContributorsByOrgs =
+SELECT  OrganizationId,
+        COUNT(DISTINCT AuthorLogin) AS CompanyContributors
+FROM @CompanyContributorsByRepos
+GROUP BY OrganizationId;
+
+@AllCommunityContributorsByOrgs =
+SELECT  OrganizationId,
+        COUNT(DISTINCT AuthorLogin) AS CommunityContributors
+FROM @CommunityContributorsByRepos
+GROUP BY OrganizationId;
+
+@OrgsFinalMetricsData =
+SELECT  OrgId,
+        OrgName,
+        Subscribers,
+        Commits,
+        LinesCommitted,
+        CommitsToday,
+        LinesCommittedToday,
+        OpenIssues,
+        AssignedOpenIssues,
+        UnassignedOpenIssues,
+        ClosedIssues,
+        OpenedIssuesToday,
+        ClosedIssuesToday,
+        AvgDaysToCloseIssues,
+        AvgDaysForFirstResponseToIssues,
+        PullRequests,
+        OpenPullRequests,
+        ClosedPullRequests,
+        AvgDaysToClosePullRequests,
+        PullRequestsOpenedToday,
+        PullRequestsClosedToday,
+        AvgDaysForFirstResponseToPullRequests,
+        Contributors,
+        CompanyContributors,
+        CommunityContributors
+FROM @OrgsMetricsData
+LEFT JOIN @AllContributorsByOrgs AS acbo ON acbo.OrganizationId == OrgId
+LEFT JOIN @AllCompanyContributorsByOrgs AS acompcbo ON acompcbo.OrganizationId == OrgId
+LEFT JOIN @AllCommunityContributorsByOrgs AS acommcbo ON acommcbo.OrganizationId == OrgId;
+
+OUTPUT @OrgsFinalMetricsData
 TO "wasb://metrics@ospobackup/orgs.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
@@ -340,13 +386,29 @@ SELECT  SUM(Subscribers) AS Subscribers,
         AVG(AvgDaysToClosePullRequests) AS AvgDaysToClosePullRequests,
         SUM(PullRequestsOpenedToday) AS PullRequestsOpenedToday,
         SUM(PullRequestsClosedToday) AS PullRequestsClosedToday,
-        AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests,
-        SUM(Contributors) AS Contributors, // TODO: summarize distinct contributors
-        SUM(CompanyContributors) AS CompanyContributors,
-        SUM(CommunityContributors) AS CommunityContributors
+        AVG(AvgDaysForFirstResponseToPullRequests) AS AvgDaysForFirstResponseToPullRequests
 FROM @OrgsMetricsData;
 
-OUTPUT @AllMetricsData
+@AllContributors =
+SELECT COUNT(DISTINCT AuthorLogin) AS Contributors
+FROM @CommitsContributorsByRepos;
+
+@AllCompanyContributors =
+SELECT COUNT(DISTINCT AuthorLogin) AS CompanyContributors
+FROM @CompanyContributorsByRepos;
+
+@AllCommunityContributors =
+SELECT COUNT(DISTINCT AuthorLogin) AS CommunityContributors
+FROM @CommunityContributorsByRepos;
+
+@AllFinalMetricsData =
+SELECT *
+FROM @AllMetricsData
+CROSS JOIN @AllContributors
+CROSS JOIN @AllCompanyContributors
+CROSS JOIN @AllCommunityContributors;
+
+OUTPUT @AllFinalMetricsData
 TO "wasb://metrics@ospobackup/all.csv"
 USING Outputters.Csv(escapeCharacter: '\\', quoting: true, outputHeader: true);
 
