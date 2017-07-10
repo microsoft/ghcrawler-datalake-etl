@@ -72,7 +72,7 @@ FROM @PathsPrePivot;
 // FROM GHInsights.dbo.Paths;
 
 @PathsDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Path, EtlIngestDate) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Path, ProcessedAt) AS RowNumber
 FROM @PathsPivoted;
 
 

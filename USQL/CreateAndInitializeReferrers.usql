@@ -73,7 +73,7 @@ FROM @ReferrersPrePivot;
 // FROM GHInsights.dbo.Referrers;
 
 @ReferrersDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Referrer, EtlIngestDate) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Referrer, ProcessedAt) AS RowNumber
 FROM @ReferrersPivoted;
 
 

@@ -3287,7 +3287,7 @@ SELECT *
 FROM GHInsights.dbo.Clones;
 
 @ClonesDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY RepoUrn, DataDate ORDER BY ProcessedAt DESC) AS RowNumber
 FROM @ClonesPivoted;
 
 
@@ -3380,7 +3380,7 @@ SELECT *
 FROM GHInsights.dbo.Referrers;
 
 @ReferrersDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Referrer, EtlIngestDate) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Referrer, ProcessedAt) AS RowNumber
 FROM @ReferrersPivoted;
 
 
@@ -3472,7 +3472,7 @@ SELECT *
 FROM GHInsights.dbo.Paths;
 
 @PathsDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Path, EtlIngestDate) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, Path, ProcessedAt) AS RowNumber
 FROM @PathsPivoted;
 
 
@@ -3565,7 +3565,7 @@ SELECT *
 FROM GHInsights.dbo.Views;
 
 @ViewsDeDupe =
-SELECT *, ROW_NUMBER() OVER(PARTITION BY Urn, DataDate ORDER BY (DeletedAt > ProcessedAt ? DeletedAt : ProcessedAt) DESC) AS RowNumber
+SELECT *, ROW_NUMBER() OVER(PARTITION BY RepoUrn, DataDate ORDER BY ProcessedAt DESC) AS RowNumber
 FROM @ViewsPivoted;
 
 
