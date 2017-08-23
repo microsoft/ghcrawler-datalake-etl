@@ -3094,6 +3094,8 @@ SELECT  Urn
         ,GHInsights.USql.Utility.GetString(Data, "privacy") AS Privacy
         ,GHInsights.USql.Utility.GetString(Data, "url") AS Url
         ,GHInsights.USql.Utility.GetString(Data, "permission") AS Permission
+        ,GHInsights.USql.Utility.GetDateTime(Data, "created_at") AS CreatedAt
+        ,GHInsights.USql.Utility.GetDateTime(Data, "updated_at") AS UpdatedAt
         ,GHInsights.USql.Utility.GetInteger(Data, "members_count") AS MembersCount
         ,GHInsights.USql.Utility.GetInteger(Data, "repos_count") AS ReposCount
         ,GHInsights.USql.Utility.GetString(Data, "_metadata.links.members.href") AS MembersUrn
@@ -3129,6 +3131,8 @@ SELECT  Urn
         ,Privacy
         ,Url
         ,Permission
+        ,CreatedAt
+        ,UpdatedAt
         ,MembersCount
         ,ReposCount
         ,MembersUrn

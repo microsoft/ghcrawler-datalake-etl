@@ -2,3 +2,4 @@
 ghcrawler-datalake-etl_settings.json
 *.sln
 *.usqlproj
+Generated/
